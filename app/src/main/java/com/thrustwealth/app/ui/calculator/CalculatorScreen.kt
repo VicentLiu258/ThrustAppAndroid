@@ -1,6 +1,7 @@
 package com.thrustwealth.app.ui.calculator
 
 import android.widget.Toast
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -43,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.thrustwealth.app.data.model.CalcMode
 import com.thrustwealth.app.engine.InstrumentConfig
+import com.thrustwealth.app.ui.components.ChatFloatingActionButton
 import com.thrustwealth.app.ui.components.ComplianceDisclaimer
 import com.thrustwealth.app.ui.components.DirectionSegmented
 import com.thrustwealth.app.ui.components.FormGroup
@@ -65,13 +67,20 @@ fun CalculatorScreen(
     onOpenPnl: () -> Unit,
     onOpenSpecs: () -> Unit,
     onOpenJournal: () -> Unit,
+    onOpenChat: () -> Unit = {},
     viewModel: CalculatorViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val unreadCount by viewModel.unreadChatCount.collectAsState()
     val colors = ThrustTheme.colors
     val context = LocalContext.current
     val instrument = viewModel.currentInstrument()
     val currency = state.preferences.accountCurrency
+
+    val fabBottomPadding by animateDpAsState(
+        targetValue = if (state.searchQuery.isBlank()) 68.dp else 20.dp,
+        label = "chat_fab_bottom_padding"
+    )
 
     LaunchedEffect(state.message) {
         state.message?.let {
@@ -80,43 +89,46 @@ fun CalculatorScreen(
         }
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(colors.bgApp)
     ) {
-        // App Bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Thrust Wealth",
-                color = BrandPrimary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(onClick = onOpenHistory) {
-                Icon(Icons.Outlined.History, contentDescription = "History", tint = colors.textPrimary)
-            }
-            IconButton(onClick = { viewModel.saveRecord() }) {
-                Icon(Icons.Outlined.BookmarkBorder, contentDescription = "Save", tint = colors.textPrimary)
-            }
-            IconButton(onClick = { viewModel.showMoreSheet(true) }) {
-                Icon(Icons.Outlined.MoreVert, contentDescription = "More", tint = colors.textPrimary)
-            }
-        }
-
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
+            modifier = Modifier.fillMaxSize()
         ) {
+            // App Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Thrust Wealth",
+                    color = BrandPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = onOpenHistory) {
+                    Icon(Icons.Outlined.History, contentDescription = "History", tint = colors.textPrimary)
+                }
+                IconButton(onClick = { viewModel.saveRecord() }) {
+                    Icon(Icons.Outlined.BookmarkBorder, contentDescription = "Save", tint = colors.textPrimary)
+                }
+                IconButton(onClick = { viewModel.showMoreSheet(true) }) {
+                    Icon(Icons.Outlined.MoreVert, contentDescription = "More", tint = colors.textPrimary)
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
+            ) {
             SearchField(
                 query = state.searchQuery,
                 onQueryChange = viewModel::setSearchQuery,
@@ -293,7 +305,7 @@ fun CalculatorScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
                 ComplianceDisclaimer()
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(80.dp))
             }
         }
 
@@ -305,6 +317,16 @@ fun CalculatorScreen(
             )
         }
     }
+
+    // 首页客服聊天悬浮入口
+    ChatFloatingActionButton(
+        onClick = onOpenChat,
+        unreadCount = unreadCount,
+        modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .padding(end = 16.dp, bottom = fabBottomPadding)
+    )
+}
 
     if (state.showSymbolPicker) {
         SymbolPickerSheet(

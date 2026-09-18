@@ -84,7 +84,8 @@ fun AppNavigation() {
                                 launchSingleTop = true
                                 restoreState = true
                             }
-                        }
+                        },
+                        onOpenChat = { navController.navigate(Screen.Chat.route) }
                     )
                 }
                 composable(Screen.Tools.route) {

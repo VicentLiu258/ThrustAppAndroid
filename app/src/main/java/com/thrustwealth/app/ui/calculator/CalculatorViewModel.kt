@@ -12,6 +12,7 @@ import com.thrustwealth.app.data.repository.InstrumentRepository
 import com.thrustwealth.app.data.repository.PreferencesRepository
 import com.thrustwealth.app.engine.CalculationEngine
 import com.thrustwealth.app.engine.InstrumentConfig
+import com.thrustwealth.app.salesmartly.SalesmartlyManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,8 +50,11 @@ data class CalculatorUiState(
 class CalculatorViewModel @Inject constructor(
     private val instrumentRepository: InstrumentRepository,
     private val historyRepository: HistoryRepository,
-    private val preferencesRepository: PreferencesRepository
+    private val preferencesRepository: PreferencesRepository,
+    private val salesmartlyManager: SalesmartlyManager
 ) : ViewModel() {
+
+    val unreadChatCount: StateFlow<Int> = salesmartlyManager.unreadCount
 
     private val _state = MutableStateFlow(CalculatorUiState())
     val state: StateFlow<CalculatorUiState> = _state.asStateFlow()
