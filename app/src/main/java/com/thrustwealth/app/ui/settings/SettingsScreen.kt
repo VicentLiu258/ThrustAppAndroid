@@ -91,6 +91,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { preferencesRepository.setTheme(theme) }
     }
 
+    fun acceptPrivacyConsent() {
+        viewModelScope.launch { preferencesRepository.acceptPrivacyConsent() }
+    }
+
     fun exportCsv(context: android.content.Context) {
         viewModelScope.launch {
             ExportHelper.exportHistoryCsv(context, historyRepository.getAll())
@@ -119,7 +123,10 @@ class SettingsViewModel @Inject constructor(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(
+    onOpenSupport: () -> Unit = {},
+    viewModel: SettingsViewModel = hiltViewModel()
+) {
     val prefs by viewModel.preferences.collectAsState()
     val sheet by viewModel.sheet.collectAsState()
     val showPurge by viewModel.showPurge.collectAsState()
@@ -201,6 +208,12 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             }
 
             Spacer(modifier = Modifier.height(20.dp))
+            SettingsGroupTitle("Help & Support")
+            SettingsCard {
+                NavRow("Customer Support") { onOpenSupport() }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
             SettingsGroupTitle("Privacy & Compliance")
             SettingsCard {
                 NavRow("Privacy Policy") { viewModel.openSheet("privacy") }
@@ -229,7 +242,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Text("Your Privacy", color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
                         Text(
-                            "Thrust Wealth is a standalone offline utility. No trade entries, balance numbers, or calculation parameters are transmitted to any remote servers. All data remains exclusively in your device's local storage.",
+                            "Thrust Wealth stores calculation history and journal records locally on your device. Trade entries, balance numbers, and calculation parameters are not uploaded for cloud sync.",
                             color = colors.textSecondary,
                             fontSize = 14.sp,
                             lineHeight = 20.sp
@@ -238,6 +251,21 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                         Text("Data Retention", color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
                         Text(
                             "You may export or permanently purge all history and journal records at any time from the Settings tab.",
+                            color = colors.textSecondary,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Third-Party SDK — SaleSmartly", color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "SDK name: SaleSmartly Android SDK\n" +
+                                "Company: Guangzhou Biaopin Software Co., Ltd.\n" +
+                                "Purpose: In-app customer support chat\n" +
+                                "Data collected: Device/system info (OS type & version, app package & version, device type/manufacturer/model, network type), IP address, and images/videos you choose to upload in chat\n" +
+                                "Permissions: Internet (required); media access & notifications (optional)\n" +
+                                "Collection method: SDK self-collection after privacy consent\n" +
+                                "Website: https://www.salesmartly.cn\n" +
+                                "SDK privacy policy: https://www.salesmartly.com/html/sdk/privacy_native_cn.html",
                             color = colors.textSecondary,
                             fontSize = 14.sp,
                             lineHeight = 20.sp

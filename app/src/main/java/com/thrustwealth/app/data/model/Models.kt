@@ -45,7 +45,11 @@ data class AppPreferences(
     val defaultSymbol: String = "XAUUSD",
     val defaultLeverage: String = "1:100",
     val lotUnitDisplay: String = "Standard",
-    val theme: ThemeMode = ThemeMode.DARK
+    val theme: ThemeMode = ThemeMode.DARK,
+    /** True after the user accepts the privacy policy (required before SaleSmartly init). */
+    val privacyConsentAccepted: Boolean = false,
+    /** Stable anonymous visitor id for SaleSmartly setLoginInfo.user_id. */
+    val guestUserId: String = ""
 )
 
 @Entity(tableName = "calculation_history")

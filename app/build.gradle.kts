@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -7,9 +9,18 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
+}
+val salesmartlyScriptUrl = localProperties.getProperty("salesmartly.scriptUrl", "")
+
 android {
     namespace = "com.thrustwealth.app"
-    compileSdk = 35
+    // SaleSmartly chatwidget-sdk-v1.0.0 requires compileSdk 36+
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.thrustwealth.app"
@@ -18,6 +29,12 @@ android {
         versionCode = 1
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField(
+            "String",
+            "SALESMARTLY_SCRIPT_URL",
+            "\"${salesmartlyScriptUrl.replace("\"", "\\\"")}\"",
+        )
     }
 
     buildTypes {
@@ -35,12 +52,15 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        }
     }
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -79,6 +99,15 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
+
+    // SaleSmartly Chat SDK (local AAR + transitive deps)
+    implementation(files("libs/salesmartly-chatwidget-sdk-v1.0.0.aar"))
+    implementation(libs.okhttp)
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.kotlinx.serialization)
+    implementation(libs.socket.io.client) {
+        exclude(group = "org.json", module = "json")
+    }
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

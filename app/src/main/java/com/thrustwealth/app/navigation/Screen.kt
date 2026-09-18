@@ -8,6 +8,7 @@ sealed class Screen(val route: String) {
     data object Pnl : Screen("pnl")
     data object Specs : Screen("specs")
     data object History : Screen("history")
+    data object Chat : Screen("chat")
 }
 
 val bottomNavScreens = listOf(

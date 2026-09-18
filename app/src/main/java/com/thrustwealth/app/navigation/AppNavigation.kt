@@ -18,6 +18,7 @@ import androidx.navigation.compose.rememberNavController
 import com.thrustwealth.app.data.model.CalculationRecord
 import com.thrustwealth.app.ui.calculator.CalculatorScreen
 import com.thrustwealth.app.ui.calculator.CalculatorViewModel
+import com.thrustwealth.app.ui.chat.ChatScreen
 import com.thrustwealth.app.ui.components.BottomTabBar
 import com.thrustwealth.app.ui.history.HistoryScreen
 import com.thrustwealth.app.ui.journal.JournalScreen
@@ -96,7 +97,12 @@ fun AppNavigation() {
                     JournalScreen()
                 }
                 composable(Screen.Settings.route) {
-                    SettingsScreen()
+                    SettingsScreen(
+                        onOpenSupport = { navController.navigate(Screen.Chat.route) }
+                    )
+                }
+                composable(Screen.Chat.route) {
+                    ChatScreen(onBack = { navController.popBackStack() })
                 }
                 composable(Screen.Pnl.route) {
                     PnlCalculatorScreen(onBack = { navController.popBackStack() })

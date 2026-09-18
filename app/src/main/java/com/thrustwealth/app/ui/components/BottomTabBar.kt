@@ -58,7 +58,8 @@ fun BottomTabBar(
         tabs.forEach { (screen, label, icon) ->
             val selected = currentRoute == screen.route ||
                 (screen == Screen.Calculator && currentRoute == Screen.History.route) ||
-                (screen == Screen.Tools && (currentRoute == Screen.Pnl.route || currentRoute == Screen.Specs.route))
+                (screen == Screen.Tools && (currentRoute == Screen.Pnl.route || currentRoute == Screen.Specs.route)) ||
+                (screen == Screen.Settings && currentRoute == Screen.Chat.route)
             TabItem(
                 label = label,
                 icon = icon,
