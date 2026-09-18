@@ -1,0 +1,30 @@
+/**
+ * Thrust Wealth - Typography Definitions
+ * Local and System Font Stack (Strictly Zero CDN / Google Fonts Dependencies)
+ * Prevents packaging / backend errors in offline, intranet, or dockerized environments.
+ */
+
+:root {
+  /* Primary Financial UI Font Stack: System native, clean, highly legible */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", 
+               "Roboto", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  
+  /* Monospace & Tabular Figures Font Stack for Financial Numbers */
+  --font-mono: "SF Mono", "Roboto Mono", "Consolas", "Liberation Mono", Menlo, Courier, monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+.num-tabular,
+.financial-figure,
+.stat-value,
+.code-val {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.02em;
+}
