@@ -15,7 +15,14 @@ val localProperties = Properties().apply {
         file.inputStream().use { load(it) }
     }
 }
-val salesmartlyScriptUrl = localProperties.getProperty("salesmartly.scriptUrl", "")
+// Android native SDK initialization requires the project JavaScript URL. A local
+// property can override this value for a different SaleSmartly project/environment.
+val configuredSalesmartlyScriptUrl = localProperties
+    .getProperty("salesmartly.scriptUrl", "")
+    .trim()
+val salesmartlyScriptUrl = configuredSalesmartlyScriptUrl.ifBlank {
+    "https://plugin-code.salesmartly.com/js/project_830957_862319_1789665876.js"
+}
 
 android {
     namespace = "com.thrustwealth.app"

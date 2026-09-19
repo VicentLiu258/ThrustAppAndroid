@@ -72,10 +72,10 @@ Android 使用新版 API：`SalesmartlyChat.initialize` / `setLoginInfo`，**不
 ## 4. Android 工程侧配置（开发自检）
 
 1. 将 AAR 放在 `app/libs/`（已纳入版本库例外规则 `!app/libs/*.aar`）。
-2. 在 **本机** `local.properties` 写入（该文件不入库）：
+2. 工程已写入当前项目地址；如需切换 SaleSmartly 项目，可在 **本机** `local.properties` 覆盖：
 
 ```properties
-salesmartly.scriptUrl=https://assets.salesmartly.com/js/project_xxxxx.js
+salesmartly.scriptUrl=https://plugin-code.salesmartly.com/js/project_830957_862319_1789665876.js
 ```
 
 3. 重新 Sync / Rebuild，使 `BuildConfig.SALESMARTLY_SCRIPT_URL` 生效。
