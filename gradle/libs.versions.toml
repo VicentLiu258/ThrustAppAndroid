@@ -1,12 +1,14 @@
 [versions]
-agp = "8.7.3"
+agp = "8.9.1"
 # SaleSmartly chatwidget-sdk-v1.0.0 ships Kotlin metadata 2.3.0
 kotlin = "2.3.10"
 ksp = "2.3.4"
 coreKtx = "1.15.0"
-lifecycleRuntime = "2.8.7"
-activityCompose = "1.9.3"
-composeBom = "2024.12.01"
+# SaleSmartly Chat SDK 1.0.0 is compiled against the 2026.03 Compose runtime.
+# Keep these versions aligned to avoid Composer API NoSuchMethodError at runtime.
+lifecycleRuntime = "2.10.0"
+activityCompose = "1.13.0"
+composeBom = "2026.03.01"
 navigationCompose = "2.8.5"
 hilt = "2.58"
 hiltNavigationCompose = "1.2.0"

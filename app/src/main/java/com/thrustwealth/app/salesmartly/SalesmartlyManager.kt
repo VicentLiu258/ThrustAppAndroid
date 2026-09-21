@@ -32,6 +32,9 @@ class SalesmartlyManager @Inject constructor(
     @Volatile
     private var initialized = false
 
+    @Volatile
+    private var currentUserId: String? = null
+
     fun initializeIfNeeded() {
         if (initialized) return
         val scriptUrl = BuildConfig.SALESMARTLY_SCRIPT_URL.trim()
@@ -52,6 +55,10 @@ class SalesmartlyManager @Inject constructor(
                 else -> 0
             }
             _unreadCount.value = num
+        })
+
+        SalesmartlyChat.push("onReceiveMessage", SalesmartlyCallback {
+            Log.d(TAG, "SaleSmartly agent message received")
         })
 
         SalesmartlyChat.initialize(context.applicationContext, scriptUrl)
@@ -89,6 +96,11 @@ class SalesmartlyManager @Inject constructor(
             Log.w(TAG, "setLoginInfo skipped: user_id and user_name are required")
             return
         }
+        if (currentUserId == userId) {
+            Log.d(TAG, "setLoginInfo skipped: identity is already active")
+            return
+        }
+        currentUserId = userId
         SalesmartlyChat.setLoginInfo(
             LoginInfo(
                 user_id = userId,
@@ -104,6 +116,7 @@ class SalesmartlyManager @Inject constructor(
     }
 
     fun clearUser() {
+        currentUserId = null
         SalesmartlyChat.clearUser()
     }
 

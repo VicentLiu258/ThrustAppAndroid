@@ -87,9 +87,11 @@ salesmartly.scriptUrl=https://plugin-code.salesmartly.com/js/project_830957_8623
 | 项 | 最低要求 | 说明 |
 |----|----------|------|
 | compileSdk | 36 | AAR 强制要求 |
+| Android Gradle Plugin | 8.9.1+ | AAR 的 Compose 依赖要求 |
 | targetSdk | 35（可保持） | 与 compileSdk 可解耦 |
 | Kotlin | 2.3.x | AAR 含 Kotlin metadata 2.3.0 |
 | KSP | 2.3.4+ | 与 Kotlin 2.3 配套 |
+| Compose BOM | 2026.03.01 | 必须与 AAR 的 Composer API 对齐 |
 | Room | 2.8.x | 避免 KSP 2.3 下签名解析错误 |
 | Hilt | 2.58+ | 支持 Kotlin 2.3 metadata |
 
