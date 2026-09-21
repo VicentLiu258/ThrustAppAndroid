@@ -100,6 +100,24 @@ class CalculationEngineTest {
     }
 
     @Test
+    fun profitLoss_target_prices_calculate_tp_and_sl() {
+        val result = CalculationEngine.calculateProfitLoss(
+            instrument = xauusd,
+            direction = "long",
+            openPrice = 2350.0,
+            closePrice = 2360.0,
+            lotSize = 0.20,
+            takeProfitPrice = 2370.0,
+            stopLossPrice = 2345.0
+        )
+        assertTrue(result.isValid)
+        assertEquals(400.0, result.takeProfitAmount!!, 0.01)
+        assertEquals(200.0, result.takeProfitPips!!, 0.1)
+        assertEquals(-100.0, result.stopLossAmount!!, 0.01)
+        assertEquals(-50.0, result.stopLossPips!!, 0.1)
+    }
+
+    @Test
     fun profitLoss_short_loss() {
         val result = CalculationEngine.calculateProfitLoss(
             instrument = xauusd,
@@ -122,5 +140,18 @@ class CalculationEngineTest {
             instrument = xauusd
         )
         assertFalse(result.isValid)
+    }
+
+    @Test
+    fun bounds_are_enforced() {
+        assertFalse(
+            CalculationEngine.calculateLotSize(10000.0, 100.01, 50.0, xauusd).isValid
+        )
+        assertFalse(
+            CalculationEngine.calculateRiskFromLots(10000.0, 0.001, 50.0, xauusd).isValid
+        )
+        assertFalse(
+            CalculationEngine.calculateProfitLoss(xauusd, "long", 2350.0, 2360.0, 100.01).isValid
+        )
     }
 }

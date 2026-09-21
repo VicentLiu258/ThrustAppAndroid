@@ -44,12 +44,12 @@ object CalculationEngine {
         direction: String = "long",
         accountCurrency: String = "USD"
     ): LotSizeResult {
-        if (instrument == null || balance <= 0 || riskPercent <= 0 || stopPips <= 0) {
+        if (instrument == null || balance <= 0 || riskPercent < 0.01 || riskPercent > 100 || stopPips <= 0) {
             return LotSizeResult(
                 isValid = false,
                 riskAmount = balance * (riskPercent / 100.0),
                 riskPercent = riskPercent,
-                error = "Enter positive balance, risk %, and stop loss pips"
+                error = "Balance must be positive; risk must be 0.01–100%; stop loss must be positive"
             )
         }
 
@@ -61,6 +61,16 @@ object CalculationEngine {
 
         val price = if (entryPrice > 0) entryPrice else instrument.defaultPrice
         val rawLots = riskAmount / (stopPips * pipValue)
+        if (rawLots > 100) {
+            return LotSizeResult(
+                isValid = false,
+                rawLots = rawLots,
+                riskAmount = riskAmount,
+                riskPercent = riskPercent,
+                pipValue = pipValue,
+                error = "Calculated lot size exceeds the 100-lot maximum"
+            )
+        }
         val suggestedLots = max(0.01, floor(rawLots * 100.0) / 100.0)
         val notionalValue = suggestedLots * instrument.contractSize * price
 
@@ -97,10 +107,10 @@ object CalculationEngine {
         direction: String = "long",
         accountCurrency: String = "USD"
     ): LotSizeResult {
-        if (instrument == null || balance <= 0 || lotSize <= 0 || stopPips <= 0) {
+        if (instrument == null || balance <= 0 || lotSize < 0.01 || lotSize > 100 || stopPips <= 0) {
             return LotSizeResult(
                 isValid = false,
-                error = "Enter valid balance, lot size, and stop loss"
+                error = "Balance must be positive; lots must be 0.01–100; stop loss must be positive"
             )
         }
 
@@ -109,6 +119,18 @@ object CalculationEngine {
         val riskPercent = (riskAmount / balance) * 100.0
         val price = if (entryPrice > 0) entryPrice else instrument.defaultPrice
         val notionalValue = lotSize * instrument.contractSize * price
+        if (riskPercent > 100) {
+            return LotSizeResult(
+                isValid = false,
+                suggestedLots = lotSize,
+                rawLots = lotSize,
+                riskAmount = riskAmount,
+                riskPercent = riskPercent,
+                pipValue = pipValue,
+                notionalValue = notionalValue,
+                error = "Calculated risk exceeds the 100% maximum"
+            )
+        }
 
         val stopLossPrice = if (price > 0) {
             val priceShift = stopPips * instrument.pipSize
@@ -139,10 +161,15 @@ object CalculationEngine {
         openPrice: Double,
         closePrice: Double,
         lotSize: Double,
+        takeProfitPrice: Double? = null,
+        stopLossPrice: Double? = null,
         accountCurrency: String = "USD"
     ): PnlResult {
-        if (instrument == null || openPrice <= 0 || closePrice <= 0 || lotSize <= 0) {
-            return PnlResult(isValid = false)
+        if (instrument == null || openPrice <= 0 || closePrice <= 0 || lotSize < 0.01 || lotSize > 100) {
+            return PnlResult(
+                isValid = false,
+                error = "Prices must be positive and lots must be 0.01–100"
+            )
         }
 
         val priceDelta = if (direction.equals("long", ignoreCase = true)) {
@@ -156,6 +183,12 @@ object CalculationEngine {
         val profitAmount = profitPips * pipValue * lotSize
         val notionalValue = lotSize * instrument.contractSize * openPrice
         val returnPercent = if (notionalValue > 0) (profitAmount / notionalValue) * 100.0 else 0.0
+        val takeProfit = calculateTarget(
+            takeProfitPrice, openPrice, lotSize, instrument, direction, pipValue
+        )
+        val stopLoss = calculateTarget(
+            stopLossPrice, openPrice, lotSize, instrument, direction, pipValue
+        )
 
         return PnlResult(
             isValid = true,
@@ -164,8 +197,30 @@ object CalculationEngine {
             profitAmount = roundToDigits(profitAmount, 2),
             returnPercent = roundToDigits(returnPercent, 2),
             notionalValue = notionalValue,
-            isProfit = profitAmount >= 0
+            isProfit = profitAmount >= 0,
+            takeProfitAmount = takeProfit?.first,
+            takeProfitPips = takeProfit?.second,
+            stopLossAmount = stopLoss?.first,
+            stopLossPips = stopLoss?.second
         )
+    }
+
+    private fun calculateTarget(
+        targetPrice: Double?,
+        openPrice: Double,
+        lotSize: Double,
+        instrument: Instrument,
+        direction: String,
+        pipValue: Double
+    ): Pair<Double, Double>? {
+        if (targetPrice == null || targetPrice <= 0) return null
+        val delta = if (direction.equals("long", ignoreCase = true)) {
+            targetPrice - openPrice
+        } else {
+            openPrice - targetPrice
+        }
+        val pips = delta / instrument.pipSize
+        return roundToDigits(pips * pipValue * lotSize, 2) to roundToDigits(pips, 1)
     }
 
     private fun roundToDigits(value: Double, digits: Int): Double {

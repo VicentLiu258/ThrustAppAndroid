@@ -91,6 +91,18 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { preferencesRepository.setTheme(theme) }
     }
 
+    fun setDefaultSymbol(symbol: String) {
+        viewModelScope.launch { preferencesRepository.setDefaultSymbol(symbol) }
+    }
+
+    fun setDefaultLeverage(leverage: String) {
+        viewModelScope.launch { preferencesRepository.setDefaultLeverage(leverage) }
+    }
+
+    fun setLotUnitDisplay(unit: String) {
+        viewModelScope.launch { preferencesRepository.setLotUnitDisplay(unit) }
+    }
+
     fun acceptPrivacyConsent() {
         viewModelScope.launch { preferencesRepository.acceptPrivacyConsent() }
     }
@@ -119,6 +131,9 @@ class SettingsViewModel @Inject constructor(
             _showPurge.update { false }
         }
     }
+
+    val instruments = instrumentRepository.observeInstruments()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -132,8 +147,12 @@ fun SettingsScreen(
     val showPurge by viewModel.showPurge.collectAsState()
     val colors = ThrustTheme.colors
     val context = LocalContext.current
+    val instruments by viewModel.instruments.collectAsState()
     var currencyExpanded by remember { mutableStateOf(false) }
     var themeExpanded by remember { mutableStateOf(false) }
+    var symbolExpanded by remember { mutableStateOf(false) }
+    var leverageExpanded by remember { mutableStateOf(false) }
+    var lotUnitExpanded by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().background(colors.bgApp)) {
         AppTopBar(title = "Settings & Preferences")
@@ -184,6 +203,51 @@ fun SettingsScreen(
                         OptionItem(label, prefs.theme == mode) {
                             viewModel.setTheme(mode)
                             themeExpanded = false
+                        }
+                    }
+                }
+                DropdownRow(
+                    label = "Default Symbol",
+                    value = prefs.defaultSymbol,
+                    expanded = symbolExpanded,
+                    onToggle = { symbolExpanded = !symbolExpanded }
+                )
+                if (symbolExpanded) {
+                    instruments.ifEmpty { com.thrustwealth.app.engine.InstrumentConfig.DEFAULT_INSTRUMENTS }
+                        .map { it.id }
+                        .distinct()
+                        .forEach { symbol ->
+                            OptionItem(symbol, prefs.defaultSymbol == symbol) {
+                                viewModel.setDefaultSymbol(symbol)
+                                symbolExpanded = false
+                            }
+                        }
+                }
+                DropdownRow(
+                    label = "Default Leverage",
+                    value = prefs.defaultLeverage,
+                    expanded = leverageExpanded,
+                    onToggle = { leverageExpanded = !leverageExpanded }
+                )
+                if (leverageExpanded) {
+                    listOf("1:50", "1:100", "1:200", "1:500").forEach { leverage ->
+                        OptionItem(leverage, prefs.defaultLeverage == leverage) {
+                            viewModel.setDefaultLeverage(leverage)
+                            leverageExpanded = false
+                        }
+                    }
+                }
+                DropdownRow(
+                    label = "Lot Unit Display",
+                    value = prefs.lotUnitDisplay,
+                    expanded = lotUnitExpanded,
+                    onToggle = { lotUnitExpanded = !lotUnitExpanded }
+                )
+                if (lotUnitExpanded) {
+                    listOf("Standard", "Mini", "Micro").forEach { unit ->
+                        OptionItem(unit, prefs.lotUnitDisplay == unit) {
+                            viewModel.setLotUnitDisplay(unit)
+                            lotUnitExpanded = false
                         }
                     }
                 }

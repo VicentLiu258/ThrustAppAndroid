@@ -73,6 +73,8 @@ class PreferencesRepository @Inject constructor(
     suspend fun setCurrency(currency: String) = update { it.copy(accountCurrency = currency) }
     suspend fun setTheme(theme: ThemeMode) = update { it.copy(theme = theme) }
     suspend fun setDefaultSymbol(symbol: String) = update { it.copy(defaultSymbol = symbol) }
+    suspend fun setDefaultLeverage(leverage: String) = update { it.copy(defaultLeverage = leverage) }
+    suspend fun setLotUnitDisplay(unit: String) = update { it.copy(lotUnitDisplay = unit) }
 
     suspend fun acceptPrivacyConsent() {
         update { current ->

@@ -61,6 +61,8 @@ data class PnlUiState(
     val openPrice: String = "2350.00",
     val closePrice: String = "2360.00",
     val lots: String = "0.20",
+    val takeProfitPrice: String = "",
+    val stopLossPrice: String = "",
     val instruments: List<Instrument> = emptyList(),
     val preferences: AppPreferences = AppPreferences(),
     val result: PnlResult = PnlResult(isValid = false),
@@ -100,6 +102,8 @@ class PnlCalculatorViewModel @Inject constructor(
                 symbol = id,
                 openPrice = inst?.defaultPrice?.toString() ?: it.openPrice,
                 closePrice = inst?.let { i -> "%.${i.digits}f".format(i.defaultPrice * 1.004) } ?: it.closePrice,
+                takeProfitPrice = "",
+                stopLossPrice = "",
                 showPicker = false
             )
         }
@@ -110,6 +114,8 @@ class PnlCalculatorViewModel @Inject constructor(
     fun setOpen(v: String) { _state.update { it.copy(openPrice = v) }; recalculate() }
     fun setClose(v: String) { _state.update { it.copy(closePrice = v) }; recalculate() }
     fun setLots(v: String) { _state.update { it.copy(lots = v) }; recalculate() }
+    fun setTakeProfit(v: String) { _state.update { it.copy(takeProfitPrice = v) }; recalculate() }
+    fun setStopLoss(v: String) { _state.update { it.copy(stopLossPrice = v) }; recalculate() }
     fun showPicker(v: Boolean) { _state.update { it.copy(showPicker = v) } }
     fun clearMessage() { _state.update { it.copy(message = null) } }
 
@@ -121,6 +127,8 @@ class PnlCalculatorViewModel @Inject constructor(
                 openPrice = inst?.defaultPrice?.toString() ?: "2350.00",
                 closePrice = inst?.let { i -> "%.${i.digits}f".format(i.defaultPrice * 1.004) } ?: "2360.00",
                 lots = "0.20",
+                takeProfitPrice = "",
+                stopLossPrice = "",
                 message = "P/L inputs reset"
             )
         }
@@ -162,6 +170,8 @@ class PnlCalculatorViewModel @Inject constructor(
             openPrice = s.openPrice.toDoubleOrNull() ?: 0.0,
             closePrice = s.closePrice.toDoubleOrNull() ?: 0.0,
             lotSize = s.lots.toDoubleOrNull() ?: 0.0,
+            takeProfitPrice = s.takeProfitPrice.toDoubleOrNull(),
+            stopLossPrice = s.stopLossPrice.toDoubleOrNull(),
             accountCurrency = s.preferences.accountCurrency
         )
         _state.update { it.copy(result = result) }
@@ -244,6 +254,15 @@ fun PnlCalculatorScreen(
             FormGroup(label = "Position Size (Lots)") {
                 FormInput(value = state.lots, onValueChange = viewModel::setLots, suffix = "lots")
             }
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                FormGroup(label = "Take Profit Target", hint = "Optional", rootModifier = Modifier.weight(1f)) {
+                    FormInput(value = state.takeProfitPrice, onValueChange = viewModel::setTakeProfit, placeholder = "Target price")
+                }
+                FormGroup(label = "Stop Loss Target", hint = "Optional", rootModifier = Modifier.weight(1f)) {
+                    FormInput(value = state.stopLossPrice, onValueChange = viewModel::setStopLoss, placeholder = "Target price")
+                }
+            }
             Spacer(modifier = Modifier.height(20.dp))
 
             val pnlColor = when {
@@ -262,7 +281,9 @@ fun PnlCalculatorScreen(
                     } else "—",
                     "Return on Notional" to if (result.isValid) {
                         "${if (result.returnPercent >= 0) "+" else ""}${FormatUtils.formatPercent(result.returnPercent, 2)}"
-                    } else "—"
+                    } else "—",
+                    "TP Target P/L" to formatTarget(result.takeProfitAmount, result.takeProfitPips, currency),
+                    "SL Target P/L" to formatTarget(result.stopLossAmount, result.stopLossPips, currency)
                 ),
                 actions = {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -312,4 +333,11 @@ fun PnlCalculatorScreen(
             onDismiss = { viewModel.showPicker(false) }
         )
     }
+}
+
+private fun formatTarget(amount: Double?, pips: Double?, currency: String): String {
+    if (amount == null || pips == null) return "—"
+    val amountSign = if (amount >= 0) "+" else "-"
+    val pipSign = if (pips >= 0) "+" else "-"
+    return "$amountSign${FormatUtils.currencySymbol(currency)}${kotlin.math.abs(amount).let { String.format("%.2f", it) }} · $pipSign${kotlin.math.abs(pips).let { String.format("%.1f", it) }} pips"
 }

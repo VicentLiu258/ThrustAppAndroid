@@ -104,7 +104,12 @@ data class PnlResult(
     val priceDelta: Double = 0.0,
     val returnPercent: Double = 0.0,
     val notionalValue: Double = 0.0,
-    val isProfit: Boolean = false
+    val isProfit: Boolean = false,
+    val takeProfitAmount: Double? = null,
+    val takeProfitPips: Double? = null,
+    val stopLossAmount: Double? = null,
+    val stopLossPips: Double? = null,
+    val error: String? = null
 )
 
 data class JournalStats(
