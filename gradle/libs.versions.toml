@@ -55,6 +55,7 @@ retrofit-kotlinx-serialization = { group = "com.squareup.retrofit2", name = "con
 socket-io-client = { group = "io.socket", name = "socket.io-client", version.ref = "socketIo" }
 appsflyer = { group = "com.appsflyer", name = "af-android-sdk", version.ref = "appsflyer" }
 play-services-ads-identifier = { group = "com.google.android.gms", name = "play-services-ads-identifier", version.ref = "playServicesAdsIdentifier" }
+coil-compose = { group = "io.coil-kt", name = "coil-compose", version = "2.7.0" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxJunit" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }

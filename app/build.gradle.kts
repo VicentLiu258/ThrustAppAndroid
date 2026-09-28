@@ -26,6 +26,9 @@ val configuredSalesmartlyScriptUrl = localProperties
 val salesmartlyScriptUrl = configuredSalesmartlyScriptUrl.ifBlank {
     "https://plugin-code.salesmartly.com/js/project_830957_862319_1789665876.js"
 }
+val configuredSalesmartlyWebUrl = localProperties
+    .getProperty("salesmartly.webUrl", "")
+    .trim()
 
 android {
     namespace = "com.thrustwealth.app"
@@ -44,6 +47,11 @@ android {
             "String",
             "SALESMARTLY_SCRIPT_URL",
             "\"${salesmartlyScriptUrl.replace("\"", "\\\"")}\"",
+        )
+        buildConfigField(
+            "String",
+            "SALESMARTLY_WEB_URL",
+            "\"${configuredSalesmartlyWebUrl.replace("\"", "\\\"")}\"",
         )
     }
 
@@ -149,6 +157,7 @@ dependencies {
 
     implementation(libs.appsflyer)
     implementation(libs.play.services.ads.identifier)
+    implementation(libs.coil.compose)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

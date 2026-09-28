@@ -1,16 +1,24 @@
 package com.thrustwealth.app.salesmartly
 
 import android.content.Context
+import android.net.Uri
 import android.util.Log
 import com.salesmartly.chatwidget.api.LoginInfo
 import com.salesmartly.chatwidget.api.SalesmartlyCallback
 import com.salesmartly.chatwidget.api.SalesmartlyChat
+import com.salesmartly.chatwidget.core.SalesmartlyRuntime
+import com.salesmartly.chatwidget.core.SalesmartlyUiState
+import com.salesmartly.chatwidget.domain.model.channelOpenUri
 import com.thrustwealth.app.BuildConfig
 import com.thrustwealth.app.appsflyer.AppsFlyerManager
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -18,13 +26,15 @@ import javax.inject.Singleton
 /**
  * SaleSmartly Chat SDK facade.
  *
- * Must only call [initialize] after the user has accepted the privacy policy.
+ * Must only call [initializeIfNeeded] after the user has accepted the privacy policy.
  */
 @Singleton
 class SalesmartlyManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val appsFlyerManager: AppsFlyerManager
 ) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
     private val _sdkReady = MutableStateFlow(false)
     val sdkReady: StateFlow<Boolean> = _sdkReady.asStateFlow()
 
@@ -34,12 +44,24 @@ class SalesmartlyManager @Inject constructor(
     private val _conversationOpen = MutableStateFlow(false)
     val conversationOpen: StateFlow<Boolean> = _conversationOpen.asStateFlow()
 
+    private val _uiState = MutableStateFlow<SalesmartlyUiState?>(null)
+    val uiState: StateFlow<SalesmartlyUiState?> = _uiState.asStateFlow()
+
     @Volatile
     private var initialized = false
 
     @Volatile
     private var currentUserId: String? = null
 
+    init {
+        // 如果已经有脚本配置，尽早尝试安全初始化
+        val scriptUrl = BuildConfig.SALESMARTLY_SCRIPT_URL.trim()
+        if (scriptUrl.isNotEmpty()) {
+            initializeIfNeeded()
+        }
+    }
+
+    @Synchronized
     fun initializeIfNeeded() {
         if (initialized) return
         val scriptUrl = BuildConfig.SALESMARTLY_SCRIPT_URL.trim()
@@ -51,6 +73,16 @@ class SalesmartlyManager @Inject constructor(
         SalesmartlyChat.push("onReady", SalesmartlyCallback {
             _sdkReady.value = true
             Log.d(TAG, "SaleSmartly SDK ready")
+            // SDK 准备就绪后，启动协程监听 runtime 的状态流并同步给 Compose
+            scope.launch {
+                runCatching {
+                    SalesmartlyChat.runtime().state.collect { state ->
+                        _uiState.value = state
+                    }
+                }.onFailure { e ->
+                    Log.w(TAG, "Failed to collect runtime state in onReady", e)
+                }
+            }
         })
 
         SalesmartlyChat.push("onUnRead", SalesmartlyCallback { payload ->
@@ -66,13 +98,15 @@ class SalesmartlyManager @Inject constructor(
             Log.d(TAG, "SaleSmartly agent message received")
         })
 
+        SalesmartlyChat.push("onOpenChat", SalesmartlyCallback {
+            // SDK 内部通知会话打开事件
+        })
+
         SalesmartlyChat.push("onCloseChat", SalesmartlyCallback {
             _conversationOpen.value = false
         })
 
         SalesmartlyChat.push("onCollectionInfo", SalesmartlyCallback { payload ->
-            // The SDK puts submitted fields in payload["payload"]. Keep
-            // the phone value inside SaleSmartly; AppsFlyer receives only a countable event.
             val fields = payload["payload"] as? Map<*, *>
             val phone = fields?.get("phone") as? String
             if (!phone.isNullOrBlank()) {
@@ -80,24 +114,25 @@ class SalesmartlyManager @Inject constructor(
             }
         })
 
-        SalesmartlyChat.initialize(context.applicationContext, scriptUrl)
-        initialized = true
-        Log.d(TAG, "SaleSmartly initialize() called")
+        runCatching {
+            SalesmartlyChat.initialize(context.applicationContext, scriptUrl)
+            initialized = true
+            Log.d(TAG, "SaleSmartly initialize() called successfully")
+        }.onFailure { e ->
+            Log.e(TAG, "Failed to initialize SaleSmartlyChat", e)
+        }
     }
 
     fun openConversation() {
-        if (!_sdkReady.value) {
-            Log.w(TAG, "openConversation ignored: SDK not ready")
-            return
-        }
-        // Called only after the visitor chooses Enter chat on the channel page.
+        initializeIfNeeded()
         _conversationOpen.value = true
-        SalesmartlyChat.openChat()
     }
 
     fun closeChat() {
         _conversationOpen.value = false
-        SalesmartlyChat.closeChat()
+        runCatching {
+            SalesmartlyChat.closeChat()
+        }
     }
 
     /**
@@ -118,31 +153,59 @@ class SalesmartlyManager @Inject constructor(
             Log.w(TAG, "setLoginInfo skipped: user_id and user_name are required")
             return
         }
+        initializeIfNeeded()
         if (currentUserId == userId) {
             Log.d(TAG, "setLoginInfo skipped: identity is already active")
             return
         }
         currentUserId = userId
-        SalesmartlyChat.setLoginInfo(
-            LoginInfo(
-                user_id = userId,
-                user_name = userName,
-                language = language,
-                phone = phone,
-                email = email,
-                description = description,
-                label_names = labelNames,
-                custom_fields_ext = customFieldsExt,
+        runCatching {
+            SalesmartlyChat.setLoginInfo(
+                LoginInfo(
+                    user_id = userId,
+                    user_name = userName,
+                    language = language,
+                    phone = phone,
+                    email = email,
+                    description = description,
+                    label_names = labelNames,
+                    custom_fields_ext = customFieldsExt,
+                )
             )
-        )
+        }.onFailure {
+            Log.w(TAG, "Failed to setLoginInfo", it)
+        }
     }
 
     fun clearUser() {
         currentUserId = null
-        SalesmartlyChat.clearUser()
+        runCatching {
+            SalesmartlyChat.clearUser()
+        }
     }
 
-    fun runtime() = SalesmartlyChat.runtime()
+    fun runtime(): SalesmartlyRuntime {
+        initializeIfNeeded()
+        return SalesmartlyChat.runtime()
+    }
+
+    fun runtimeOrNull(): SalesmartlyRuntime? {
+        return runCatching {
+            initializeIfNeeded()
+            SalesmartlyChat.runtime()
+        }.getOrNull()
+    }
+
+    fun externalChannelUrl(channel: String): String? {
+        val info = _uiState.value?.widgetInfo
+            ?: runtimeOrNull()?.state?.value?.widgetInfo
+            ?: return null
+        val rawUrl = info.channelOpenUri(channel) ?: return null
+        val uri = Uri.parse(rawUrl)
+        val scheme = uri.scheme?.lowercase()
+        if (scheme != "https" && scheme != "http" && scheme != "mailto" && scheme != "tel") return null
+        return rawUrl
+    }
 
     companion object {
         private const val TAG = "SalesmartlyManager"

@@ -2,6 +2,7 @@ package com.thrustwealth.app.ui.calculator
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.salesmartly.chatwidget.core.SalesmartlyUiState
 import com.thrustwealth.app.appsflyer.AppsFlyerManager
 import com.thrustwealth.app.data.model.AppPreferences
 import com.thrustwealth.app.data.model.CalcMode
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -62,6 +64,27 @@ class CalculatorViewModel @Inject constructor(
 ) : ViewModel() {
 
     val unreadChatCount: StateFlow<Int> = salesmartlyManager.unreadCount
+    val salesmartlyUiState: StateFlow<SalesmartlyUiState?> = salesmartlyManager.uiState
+
+    fun externalChannelUrl(channel: String): String? = salesmartlyManager.externalChannelUrl(channel)
+
+    fun prepareNativeChat() {
+        viewModelScope.launch {
+            val preferences = preferencesRepository.preferences.first()
+            if (!preferences.privacyConsentAccepted) {
+                preferencesRepository.acceptPrivacyConsent()
+            }
+            val userId = preferences.guestUserId.takeIf { it.isNotBlank() }
+                ?: preferencesRepository.ensureGuestUserId()
+            salesmartlyManager.setLoginInfo(
+                userId = userId,
+                userName = "Thrust Guest",
+                language = "en-US",
+                description = "Thrust Wealth App User",
+                labelNames = SalesmartlyManager.DEFAULT_LABELS,
+            )
+        }
+    }
 
     private val _state = MutableStateFlow(CalculatorUiState())
     val state: StateFlow<CalculatorUiState> = _state.asStateFlow()

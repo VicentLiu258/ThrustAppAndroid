@@ -1,11 +1,14 @@
 package com.thrustwealth.app.ui.calculator
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +40,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,9 +55,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.salesmartly.chatwidget.domain.model.channelList
 import com.thrustwealth.app.data.model.CalcMode
 import com.thrustwealth.app.engine.InstrumentConfig
 import com.thrustwealth.app.ui.components.ChatFloatingActionButton
+import com.thrustwealth.app.ui.components.ChatFloatingSpeedDial
 import com.thrustwealth.app.ui.components.ComplianceDisclaimer
 import com.thrustwealth.app.ui.components.DirectionSegmented
 import com.thrustwealth.app.ui.components.FormGroup
@@ -79,6 +87,21 @@ fun CalculatorScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val unreadCount by viewModel.unreadChatCount.collectAsState()
+    val salesmartlyUiState by viewModel.salesmartlyUiState.collectAsState()
+    val widgetInfo = salesmartlyUiState?.widgetInfo
+    val brandColor = remember(widgetInfo?.background_color) {
+        parseHexColor(widgetInfo?.background_color, fallback = Color(0xFFE9AE17))
+    }
+    val channels = remember(widgetInfo) {
+        if (widgetInfo != null) {
+            val list = widgetInfo.channelList()
+            if (list.isNotEmpty()) list else widgetInfo.channel
+        } else {
+            listOf("chat", "whatsapp")
+        }
+    }
+    var isChatFabExpanded by remember { mutableStateOf(false) }
+
     val colors = ThrustTheme.colors
     val context = LocalContext.current
     val instrument = viewModel.currentInstrument()
@@ -356,10 +379,51 @@ fun CalculatorScreen(
         }
     }
 
-    // 首页客服聊天悬浮入口: 恢复调整前的右下角浮动按钮
-    ChatFloatingActionButton(
-        onClick = onOpenChat,
+    // 展开状态下的半透明全局暗化遮罩
+    if (isChatFabExpanded) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.45f))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {
+                    isChatFabExpanded = false
+                }
+        )
+    }
+
+    // 首页客服多渠道展开收起悬浮挂件（完全响应式绑定 SaleSmartly 后台配置）
+    ChatFloatingSpeedDial(
+        channels = channels,
+        brandColor = brandColor,
         unreadCount = unreadCount,
+        isExpanded = isChatFabExpanded,
+        onExpandedChange = { isChatFabExpanded = it },
+        onChatClick = {
+            viewModel.prepareNativeChat()
+            onOpenChat()
+        },
+        onExternalChannelClick = { channel ->
+            val targetUrl = viewModel.externalChannelUrl(channel)
+            if (!targetUrl.isNullOrBlank()) {
+                runCatching {
+                    val uri = Uri.parse(targetUrl)
+                    val intent = if (targetUrl.startsWith("mailto:", ignoreCase = true)) {
+                        Intent(Intent.ACTION_SENDTO, uri)
+                    } else {
+                        Intent(Intent.ACTION_VIEW, uri)
+                    }
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                }.onFailure {
+                    Toast.makeText(context, "Could not open $channel application", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                Toast.makeText(context, "$channel is not configured yet", Toast.LENGTH_SHORT).show()
+            }
+        },
         modifier = Modifier
             .align(Alignment.BottomEnd)
             .padding(end = 16.dp, bottom = fabBottomPadding)
@@ -568,4 +632,13 @@ private fun SheetAction(label: String, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(vertical = 14.dp)
     )
+}
+
+private fun parseHexColor(hex: String?, fallback: Color = Color(0xFFE9AE17)): Color {
+    if (hex.isNullOrBlank()) return fallback
+    return runCatching {
+        val clean = hex.trim()
+        val formatted = if (clean.startsWith("#")) clean else "#$clean"
+        Color(android.graphics.Color.parseColor(formatted))
+    }.getOrDefault(fallback)
 }
