@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
@@ -56,6 +57,8 @@ import com.thrustwealth.app.ui.components.ComplianceDisclaimer
 import com.thrustwealth.app.ui.theme.BrandPrimary
 import com.thrustwealth.app.ui.theme.ThrustTheme
 import com.thrustwealth.app.util.ExportHelper
+import com.thrustwealth.app.util.LegalConstants
+import com.thrustwealth.app.util.openWebUrl
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -107,6 +110,8 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { preferencesRepository.acceptPrivacyConsent() }
     }
 
+    suspend fun ensureGuestUserId(): String = preferencesRepository.ensureGuestUserId()
+
     fun exportCsv(context: android.content.Context) {
         viewModelScope.launch {
             ExportHelper.exportHistoryCsv(context, historyRepository.getAll())
@@ -150,9 +155,6 @@ fun SettingsScreen(
     val instruments by viewModel.instruments.collectAsState()
     var currencyExpanded by remember { mutableStateOf(false) }
     var themeExpanded by remember { mutableStateOf(false) }
-    var symbolExpanded by remember { mutableStateOf(false) }
-    var leverageExpanded by remember { mutableStateOf(false) }
-    var lotUnitExpanded by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().background(colors.bgApp)) {
         AppTopBar(title = "Settings & Preferences")
@@ -162,19 +164,24 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
+            // 1. Preferences
             SettingsGroupTitle("Preferences")
             SettingsCard {
-                DropdownRow(
+                SettingsRowItem(
                     label = "Account Currency",
-                    value = when (prefs.accountCurrency) {
-                        "USD" -> "USD ($)"
-                        "EUR" -> "EUR (€)"
-                        "GBP" -> "GBP (£)"
-                        "JPY" -> "JPY (¥)"
-                        else -> prefs.accountCurrency
-                    },
-                    expanded = currencyExpanded,
-                    onToggle = { currencyExpanded = !currencyExpanded }
+                    sub = "Base currency for calculations",
+                    trailing = {
+                        CustomDropdownTrigger(
+                            value = when (prefs.accountCurrency) {
+                                "USD" -> "USD ($)"
+                                "EUR" -> "EUR (€)"
+                                "GBP" -> "GBP (£)"
+                                "JPY" -> "JPY (¥)"
+                                else -> prefs.accountCurrency
+                            },
+                            onClick = { currencyExpanded = !currencyExpanded }
+                        )
+                    }
                 )
                 if (currencyExpanded) {
                     listOf("USD" to "USD ($)", "EUR" to "EUR (€)", "GBP" to "GBP (£)", "JPY" to "JPY (¥)").forEach { (code, label) ->
@@ -184,15 +191,22 @@ fun SettingsScreen(
                         }
                     }
                 }
-                DropdownRow(
+
+                SettingsDivider()
+
+                SettingsRowItem(
                     label = "Default Theme",
-                    value = when (prefs.theme) {
-                        ThemeMode.DARK -> "Dark (Preferred)"
-                        ThemeMode.LIGHT -> "Light"
-                        ThemeMode.AUTO -> "System Default"
-                    },
-                    expanded = themeExpanded,
-                    onToggle = { themeExpanded = !themeExpanded }
+                    sub = "Color scheme preference",
+                    trailing = {
+                        CustomDropdownTrigger(
+                            value = when (prefs.theme) {
+                                ThemeMode.DARK -> "Dark (Preferred)"
+                                ThemeMode.LIGHT -> "Light"
+                                ThemeMode.AUTO -> "System Default"
+                            },
+                            onClick = { themeExpanded = !themeExpanded }
+                        )
+                    }
                 )
                 if (themeExpanded) {
                     listOf(
@@ -206,83 +220,145 @@ fun SettingsScreen(
                         }
                     }
                 }
-                DropdownRow(
-                    label = "Default Symbol",
-                    value = prefs.defaultSymbol,
-                    expanded = symbolExpanded,
-                    onToggle = { symbolExpanded = !symbolExpanded }
-                )
-                if (symbolExpanded) {
-                    instruments.ifEmpty { com.thrustwealth.app.engine.InstrumentConfig.DEFAULT_INSTRUMENTS }
-                        .map { it.id }
-                        .distinct()
-                        .forEach { symbol ->
-                            OptionItem(symbol, prefs.defaultSymbol == symbol) {
-                                viewModel.setDefaultSymbol(symbol)
-                                symbolExpanded = false
-                            }
-                        }
-                }
-                DropdownRow(
-                    label = "Default Leverage",
-                    value = prefs.defaultLeverage,
-                    expanded = leverageExpanded,
-                    onToggle = { leverageExpanded = !leverageExpanded }
-                )
-                if (leverageExpanded) {
-                    listOf("1:50", "1:100", "1:200", "1:500").forEach { leverage ->
-                        OptionItem(leverage, prefs.defaultLeverage == leverage) {
-                            viewModel.setDefaultLeverage(leverage)
-                            leverageExpanded = false
-                        }
+
+                SettingsDivider()
+
+                // 二级入口: 交易默认配置 (保留原有品种、杠杆、单位设置，避免挤占主界面)
+                SettingsRowItem(
+                    label = "Trading Parameters",
+                    sub = "Default symbol, leverage & display units",
+                    onClick = { viewModel.openSheet("trading_defaults") },
+                    trailing = {
+                        Icon(
+                            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = colors.textTertiary,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
-                }
-                DropdownRow(
-                    label = "Lot Unit Display",
-                    value = prefs.lotUnitDisplay,
-                    expanded = lotUnitExpanded,
-                    onToggle = { lotUnitExpanded = !lotUnitExpanded }
                 )
-                if (lotUnitExpanded) {
-                    listOf("Standard", "Mini", "Micro").forEach { unit ->
-                        OptionItem(unit, prefs.lotUnitDisplay == unit) {
-                            viewModel.setLotUnitDisplay(unit)
-                            lotUnitExpanded = false
-                        }
-                    }
-                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
+
+            // 2. Data Management
             SettingsGroupTitle("Data Management")
             SettingsCard {
-                NavRow("Export Calculations to CSV") { viewModel.exportCsv(context) }
-                NavRow("Full App Backup (JSON)") { viewModel.exportJson(context) }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { viewModel.showPurge(true) }
-                        .padding(horizontal = 14.dp, vertical = 14.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Purge & Reset All App Data", color = colors.loss, fontSize = 15.sp)
-                    Icon(Icons.Outlined.DeleteOutline, null, tint = colors.loss, modifier = Modifier.size(18.dp))
-                }
+                SettingsRowItem(
+                    label = "Export Calculations to CSV",
+                    sub = "Download complete calculation log",
+                    onClick = { viewModel.exportCsv(context) },
+                    trailing = {
+                        Icon(
+                            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = colors.textTertiary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                )
+
+                SettingsDivider()
+
+                SettingsRowItem(
+                    label = "Full App Backup (JSON)",
+                    sub = "Export journal trades, specs, and preferences",
+                    onClick = { viewModel.exportJson(context) },
+                    trailing = {
+                        Icon(
+                            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = colors.textTertiary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                )
+
+                SettingsDivider()
+
+                SettingsRowItem(
+                    label = "Purge & Reset All App Data",
+                    sub = "Clear all local calculations and trades",
+                    isDanger = true,
+                    onClick = { viewModel.showPurge(true) },
+                    trailing = {
+                        Icon(
+                            Icons.Outlined.DeleteOutline,
+                            contentDescription = null,
+                            tint = colors.loss,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                )
             }
 
             Spacer(modifier = Modifier.height(20.dp))
-            SettingsGroupTitle("Help & Support")
-            SettingsCard {
-                NavRow("Customer Support") { onOpenSupport() }
-            }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            // 3. Privacy & Compliance
             SettingsGroupTitle("Privacy & Compliance")
             SettingsCard {
-                NavRow("Privacy Policy") { viewModel.openSheet("privacy") }
-                NavRow("Terms of Service") { viewModel.openSheet("terms") }
-                NavRow("About Thrust Wealth") { viewModel.openSheet("about") }
+                SettingsRowItem(
+                    label = "Privacy Policy",
+                    sub = "Zero telemetry & local-only storage guarantee",
+                    onClick = { viewModel.openSheet("privacy") },
+                    trailing = {
+                        Icon(
+                            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = colors.textTertiary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                )
+
+                SettingsDivider()
+
+                SettingsRowItem(
+                    label = "Terms of Service",
+                    sub = "Calculator disclaimer & computational terms",
+                    onClick = { viewModel.openSheet("terms") },
+                    trailing = {
+                        Icon(
+                            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = colors.textTertiary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                )
+
+                SettingsDivider()
+
+                SettingsRowItem(
+                    label = "About Thrust Wealth",
+                    sub = "Version 1.0.0 — Pure Math Engine",
+                    onClick = { viewModel.openSheet("about") },
+                    trailing = {
+                        Icon(
+                            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = colors.textTertiary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                )
+
+                SettingsDivider()
+
+                // 保留客服支持二级入口
+                SettingsRowItem(
+                    label = "Customer Support",
+                    sub = "Contact help desk & product support",
+                    onClick = { onOpenSupport() },
+                    trailing = {
+                        Icon(
+                            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = colors.textTertiary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                )
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -299,11 +375,67 @@ fun SettingsScreen(
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             containerColor = colors.bgSurface
         ) {
-            Column(modifier = Modifier.padding(20.dp)) {
+            Column(
+                modifier = Modifier
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
                 when (sheet) {
+                    "trading_defaults" -> {
+                        Text("Trading Parameters", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        SettingsGroupTitle("Default Symbol")
+                        SettingsCard {
+                            instruments.ifEmpty { com.thrustwealth.app.engine.InstrumentConfig.DEFAULT_INSTRUMENTS }
+                                .map { it.id }
+                                .distinct()
+                                .forEach { symbol ->
+                                    OptionItem(symbol, prefs.defaultSymbol == symbol) {
+                                        viewModel.setDefaultSymbol(symbol)
+                                    }
+                                }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        SettingsGroupTitle("Default Leverage")
+                        SettingsCard {
+                            listOf("1:50", "1:100", "1:200", "1:500").forEach { leverage ->
+                                OptionItem(leverage, prefs.defaultLeverage == leverage) {
+                                    viewModel.setDefaultLeverage(leverage)
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        SettingsGroupTitle("Lot Unit Display")
+                        SettingsCard {
+                            listOf("Standard", "Mini", "Micro").forEach { unit ->
+                                OptionItem(unit, prefs.lotUnitDisplay == unit) {
+                                    viewModel.setLotUnitDisplay(unit)
+                                }
+                            }
+                        }
+                    }
                     "privacy" -> {
                         Text("Privacy Policy", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(colors.brand.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                                .clickable { context.openWebUrl(LegalConstants.PRIVACY_POLICY_URL) }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Online Privacy Policy", color = colors.brand, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                Text(LegalConstants.PRIVACY_POLICY_URL, color = colors.textSecondary, fontSize = 11.sp)
+                            }
+                            Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = "Open", tint = colors.brand, modifier = Modifier.size(16.dp))
+                        }
+                        Spacer(modifier = Modifier.height(14.dp))
                         Text("Your Privacy", color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
                         Text(
                             "Thrust Wealth stores calculation history and journal records locally on your device. Trade entries, balance numbers, and calculation parameters are not uploaded for cloud sync.",
@@ -334,10 +466,41 @@ fun SettingsScreen(
                             fontSize = 14.sp,
                             lineHeight = 20.sp
                         )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("Third-Party SDK — AppsFlyer", color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "SDK name: AppsFlyer Android SDK\n" +
+                                "Company: AppsFlyer Inc.\n" +
+                                "Purpose: Search attribution and marketing analytics\n" +
+                                "Data collected: Device identifiers (GAID, Android ID if permitted), app install/launch timestamps, IP address, OS version, device model\n" +
+                                "Permissions: Internet, Access Network State\n" +
+                                "Collection method: SDK self-collection after user consent\n" +
+                                "Website: https://www.appsflyer.com\n" +
+                                "SDK privacy policy: https://www.appsflyer.com/legal/services-privacy-policy/",
+                            color = colors.textSecondary,
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp
+                        )
                     }
                     "terms" -> {
                         Text("Terms of Service", color = colors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(colors.brand.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                                .clickable { context.openWebUrl(LegalConstants.TERMS_OF_USE_URL) }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Online Terms of Service", color = colors.brand, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                Text(LegalConstants.TERMS_OF_USE_URL, color = colors.textSecondary, fontSize = 11.sp)
+                            }
+                            Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = "Open", tint = colors.brand, modifier = Modifier.size(16.dp))
+                        }
+                        Spacer(modifier = Modifier.height(14.dp))
                         Text("About This Tool", color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
                         Text(
                             "Thrust Wealth provides mathematical calculations based on standard contract specifications. It does not provide trade executions, investment recommendations, or portfolio guarantees.",
@@ -403,39 +566,100 @@ private fun SettingsGroupTitle(title: String) {
         fontSize = 11.sp,
         fontWeight = FontWeight.Bold,
         letterSpacing = 0.8.sp,
-        modifier = Modifier.padding(bottom = 8.dp)
+        modifier = Modifier.padding(bottom = 8.dp, start = 2.dp)
     )
 }
 
 @Composable
 private fun SettingsCard(content: @Composable () -> Unit) {
     val colors = ThrustTheme.colors
+    val shape = RoundedCornerShape(16.dp)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(colors.bgElevated, RoundedCornerShape(14.dp))
-            .border(1.dp, colors.borderSubtle, RoundedCornerShape(14.dp))
+            .background(colors.bgSurface, shape)
+            .border(1.dp, colors.borderSubtle, shape)
     ) {
         content()
     }
 }
 
 @Composable
-private fun DropdownRow(label: String, value: String, expanded: Boolean, onToggle: () -> Unit) {
+private fun SettingsDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(ThrustTheme.colors.borderSubtle)
+    )
+}
+
+@Composable
+private fun SettingsRowItem(
+    label: String,
+    sub: String? = null,
+    isDanger: Boolean = false,
+    onClick: (() -> Unit)? = null,
+    trailing: @Composable () -> Unit
+) {
     val colors = ThrustTheme.colors
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onToggle)
-            .padding(horizontal = 14.dp, vertical = 14.dp),
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, color = colors.textPrimary, fontSize = 15.sp)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(value, color = colors.textSecondary, fontSize = 14.sp)
-            Icon(Icons.Outlined.KeyboardArrowDown, null, tint = colors.textTertiary, modifier = Modifier.size(18.dp))
+        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(
+                text = label,
+                color = if (isDanger) colors.loss else colors.textPrimary,
+                fontSize = 14.5.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            if (sub != null) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = sub,
+                    color = colors.textTertiary,
+                    fontSize = 11.5.sp,
+                    lineHeight = 15.sp
+                )
+            }
         }
+        trailing()
+    }
+}
+
+@Composable
+private fun CustomDropdownTrigger(
+    value: String,
+    onClick: () -> Unit
+) {
+    val colors = ThrustTheme.colors
+    Row(
+        modifier = Modifier
+            .height(34.dp)
+            .background(colors.bgElevated, RoundedCornerShape(10.dp))
+            .border(1.dp, colors.borderMedium, RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(
+            text = value,
+            color = colors.textPrimary,
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+        Icon(
+            imageVector = Icons.Outlined.KeyboardArrowDown,
+            contentDescription = null,
+            tint = colors.textTertiary,
+            modifier = Modifier.size(16.dp)
+        )
     }
 }
 
@@ -446,29 +670,14 @@ private fun OptionItem(label: String, selected: Boolean, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .background(if (selected) colors.brand.copy(alpha = 0.1f) else Color.Transparent)
+            .background(if (selected) colors.brand.copy(alpha = 0.12f) else Color.Transparent)
             .padding(horizontal = 20.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(label, color = colors.textPrimary, fontSize = 14.sp)
         if (selected) {
             Icon(Icons.Outlined.Check, null, tint = colors.brand, modifier = Modifier.size(18.dp))
         }
-    }
-}
-
-@Composable
-private fun NavRow(label: String, onClick: () -> Unit) {
-    val colors = ThrustTheme.colors
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(label, color = colors.textPrimary, fontSize = 15.sp)
-        Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = colors.textTertiary, modifier = Modifier.size(18.dp))
     }
 }

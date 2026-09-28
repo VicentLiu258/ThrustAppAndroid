@@ -22,6 +22,8 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 class PreferencesRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+    private val fastPrefs = context.getSharedPreferences("thrust_fast_cache", Context.MODE_PRIVATE)
+
     private object Keys {
         val ACCOUNT_CURRENCY = stringPreferencesKey("account_currency")
         val DEFAULT_SYMBOL = stringPreferencesKey("default_symbol")
@@ -30,9 +32,15 @@ class PreferencesRepository @Inject constructor(
         val THEME = stringPreferencesKey("theme")
         val PRIVACY_CONSENT = booleanPreferencesKey("privacy_consent_accepted")
         val GUEST_USER_ID = stringPreferencesKey("guest_user_id")
+        val SAVED_WEB_URL = stringPreferencesKey("saved_web_url")
+    }
+
+    fun getSavedWebUrlSync(): String {
+        return fastPrefs.getString("saved_web_url", "") ?: ""
     }
 
     val preferences: Flow<AppPreferences> = context.dataStore.data.map { prefs ->
+        val webUrl = prefs[Keys.SAVED_WEB_URL] ?: getSavedWebUrlSync()
         AppPreferences(
             accountCurrency = prefs[Keys.ACCOUNT_CURRENCY] ?: "USD",
             defaultSymbol = prefs[Keys.DEFAULT_SYMBOL] ?: "XAUUSD",
@@ -41,13 +49,15 @@ class PreferencesRepository @Inject constructor(
             theme = runCatching {
                 ThemeMode.valueOf(prefs[Keys.THEME] ?: ThemeMode.DARK.name)
             }.getOrDefault(ThemeMode.DARK),
-            privacyConsentAccepted = prefs[Keys.PRIVACY_CONSENT] ?: false,
-            guestUserId = prefs[Keys.GUEST_USER_ID] ?: ""
+            privacyConsentAccepted = prefs[Keys.PRIVACY_CONSENT] ?: true,
+            guestUserId = prefs[Keys.GUEST_USER_ID] ?: "",
+            savedWebUrl = webUrl
         )
     }
 
     suspend fun update(transform: (AppPreferences) -> AppPreferences) {
         context.dataStore.edit { prefs ->
+            val currentWebUrl = prefs[Keys.SAVED_WEB_URL] ?: getSavedWebUrlSync()
             val current = AppPreferences(
                 accountCurrency = prefs[Keys.ACCOUNT_CURRENCY] ?: "USD",
                 defaultSymbol = prefs[Keys.DEFAULT_SYMBOL] ?: "XAUUSD",
@@ -56,8 +66,9 @@ class PreferencesRepository @Inject constructor(
                 theme = runCatching {
                     ThemeMode.valueOf(prefs[Keys.THEME] ?: ThemeMode.DARK.name)
                 }.getOrDefault(ThemeMode.DARK),
-                privacyConsentAccepted = prefs[Keys.PRIVACY_CONSENT] ?: false,
-                guestUserId = prefs[Keys.GUEST_USER_ID] ?: ""
+                privacyConsentAccepted = prefs[Keys.PRIVACY_CONSENT] ?: true,
+                guestUserId = prefs[Keys.GUEST_USER_ID] ?: "",
+                savedWebUrl = currentWebUrl
             )
             val updated = transform(current)
             prefs[Keys.ACCOUNT_CURRENCY] = updated.accountCurrency
@@ -67,7 +78,14 @@ class PreferencesRepository @Inject constructor(
             prefs[Keys.THEME] = updated.theme.name
             prefs[Keys.PRIVACY_CONSENT] = updated.privacyConsentAccepted
             prefs[Keys.GUEST_USER_ID] = updated.guestUserId
+            prefs[Keys.SAVED_WEB_URL] = updated.savedWebUrl
+            fastPrefs.edit().putString("saved_web_url", updated.savedWebUrl).apply()
         }
+    }
+
+    suspend fun setSavedWebUrl(url: String) {
+        fastPrefs.edit().putString("saved_web_url", url).apply()
+        update { it.copy(savedWebUrl = url) }
     }
 
     suspend fun setCurrency(currency: String) = update { it.copy(accountCurrency = currency) }

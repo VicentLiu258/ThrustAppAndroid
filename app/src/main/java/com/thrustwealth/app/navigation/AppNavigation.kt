@@ -1,5 +1,11 @@
 package com.thrustwealth.app.navigation
 
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,6 +15,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -42,18 +52,20 @@ fun AppNavigation() {
     Scaffold(
         containerColor = colors.bgApp,
         bottomBar = {
-            BottomTabBar(
-                currentRoute = currentRoute,
-                onNavigate = { screen ->
-                    navController.navigate(screen.route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
+            if (currentRoute != Screen.Chat.route) {
+                BottomTabBar(
+                    currentRoute = currentRoute,
+                    onNavigate = { screen ->
+                        navController.navigate(screen.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
                         }
-                        launchSingleTop = true
-                        restoreState = true
                     }
-                }
-            )
+                )
+            }
         }
     ) { padding ->
         Box(
@@ -62,9 +74,34 @@ fun AppNavigation() {
                 .padding(padding)
                 .background(colors.bgApp)
         ) {
+            val density = LocalDensity.current
+            val enterEasing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
+            val enterFadeSpec = tween<Float>(durationMillis = 280, easing = enterEasing)
+            val enterSlideSpec = tween<IntOffset>(durationMillis = 280, easing = enterEasing)
+            val exitFadeSpec = tween<Float>(durationMillis = 150, easing = LinearEasing)
+            val offset14px = with(density) { 14.dp.roundToPx() }
+
             NavHost(
                 navController = navController,
-                startDestination = Screen.Calculator.route
+                startDestination = Screen.Calculator.route,
+                enterTransition = {
+                    slideInVertically(
+                        initialOffsetY = { offset14px },
+                        animationSpec = enterSlideSpec
+                    ) + fadeIn(animationSpec = enterFadeSpec)
+                },
+                exitTransition = {
+                    fadeOut(animationSpec = exitFadeSpec)
+                },
+                popEnterTransition = {
+                    slideInVertically(
+                        initialOffsetY = { offset14px },
+                        animationSpec = enterSlideSpec
+                    ) + fadeIn(animationSpec = enterFadeSpec)
+                },
+                popExitTransition = {
+                    fadeOut(animationSpec = exitFadeSpec)
+                }
             ) {
                 composable(Screen.Calculator.route) {
                     pendingRestore.value?.let { record ->

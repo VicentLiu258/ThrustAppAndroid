@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
@@ -53,11 +55,11 @@ class ChatViewModel @Inject constructor(
 
     fun ensureIdentityAndOpen() {
         viewModelScope.launch {
-            val prefs = preferences.value ?: return@launch
-            if (!prefs.privacyConsentAccepted) return@launch
-            val userId = prefs.guestUserId.ifBlank {
-                preferencesRepository.ensureGuestUserId()
+            if (preferences.value?.privacyConsentAccepted != true) {
+                preferencesRepository.acceptPrivacyConsent()
             }
+            val userId = preferences.value?.guestUserId?.takeIf { it.isNotBlank() }
+                ?: preferencesRepository.ensureGuestUserId()
             salesmartlyManager.setLoginInfo(
                 userId = userId,
                 userName = "Thrust Guest",
@@ -82,14 +84,20 @@ fun ChatScreen(
     val prefs by viewModel.preferences.collectAsState()
     var openedOnce by remember { mutableStateOf(false) }
 
-    LaunchedEffect(sdkReady, prefs?.privacyConsentAccepted) {
-        if (!openedOnce && sdkReady && prefs?.privacyConsentAccepted == true) {
+    LaunchedEffect(sdkReady, prefs?.guestUserId) {
+        if (!openedOnce && sdkReady && prefs != null) {
             openedOnce = true
             viewModel.ensureIdentityAndOpen()
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(colors.bgApp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.bgApp)
+            .navigationBarsPadding()
+            .imePadding()
+    ) {
         AppTopBar(title = "Customer Support", onBack = onBack)
         Box(
             modifier = Modifier
@@ -101,12 +109,6 @@ fun ChatScreen(
                     PlaceholderMessage(
                         title = "Support not configured",
                         body = "SaleSmartly script URL is missing. Add salesmartly.scriptUrl to local.properties and rebuild."
-                    )
-                }
-                prefs?.privacyConsentAccepted != true -> {
-                    PlaceholderMessage(
-                        title = "Privacy consent required",
-                        body = "Please accept the privacy policy on first launch before using customer support."
                     )
                 }
                 !sdkReady -> {

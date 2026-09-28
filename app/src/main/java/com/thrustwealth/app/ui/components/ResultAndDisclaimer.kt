@@ -3,6 +3,7 @@ package com.thrustwealth.app.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Shield
@@ -19,6 +21,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -34,7 +39,7 @@ fun ComplianceDisclaimer(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(colors.bgInput, RoundedCornerShape(12.dp))
+            .background(colors.bgSurface, RoundedCornerShape(12.dp))
             .border(1.dp, colors.borderSubtle, RoundedCornerShape(12.dp))
             .padding(12.dp),
         verticalAlignment = Alignment.Top
@@ -61,90 +66,157 @@ fun ResultShowcaseCard(
     heroTitle: String,
     heroValue: String,
     heroSub: String? = null,
-    heroValueColor: androidx.compose.ui.graphics.Color? = null,
+    heroValueColor: Color? = null,
     stats: List<Pair<String, String>>,
     modifier: Modifier = Modifier,
     actions: @Composable (() -> Unit)? = null
 ) {
     val colors = ThrustTheme.colors
+    val cardShape = RoundedCornerShape(18.dp)
+
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(colors.bgElevated, RoundedCornerShape(16.dp))
-            .border(1.dp, colors.brand.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-            .padding(16.dp)
+            .clip(cardShape)
+            .background(colors.bgSurface)
+            .border(1.dp, colors.borderSubtle, cardShape)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = badge.uppercase(),
-                color = colors.brandLight,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.8.sp
-            )
-            Text(
-                text = "Live Update",
-                color = colors.textTertiary,
-                fontSize = 11.sp
-            )
-        }
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(text = heroTitle, color = colors.textSecondary, fontSize = 13.sp)
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = heroValue,
-            color = heroValueColor ?: colors.textPrimary,
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace
-        )
-        if (heroSub != null) {
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(text = heroSub, color = colors.textTertiary, fontSize = 12.sp)
-        }
-        Spacer(modifier = Modifier.height(14.dp))
-        Spacer(
+        // 顶部青绿色强调线 (原型规范: solid green #19A492 3px)
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(1.dp)
-                .background(colors.borderSubtle)
+                .height(3.dp)
+                .background(colors.brand)
         )
-        Spacer(modifier = Modifier.height(14.dp))
 
-        val rows = stats.chunked(2)
-        rows.forEach { row ->
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp)
+        ) {
+            // 徽章与 Live Update
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                row.forEach { (label, value) ->
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(text = label, color = colors.textTertiary, fontSize = 11.sp)
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = value,
-                            color = colors.textPrimary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            fontFamily = FontFamily.Monospace
+                Box(
+                    modifier = Modifier
+                        .background(
+                            brush = Brush.linearGradient(
+                                listOf(colors.brand, colors.brandDark)
+                            ),
+                            shape = RoundedCornerShape(50)
                         )
-                    }
+                        .padding(horizontal = 10.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = badge.uppercase(),
+                        color = Color.White,
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.8.sp
+                    )
                 }
-                if (row.size == 1) {
-                    Spacer(modifier = Modifier.weight(1f))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(colors.brand, CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        text = "Live Update",
+                        color = colors.textTertiary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
-        }
 
-        if (actions != null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            actions()
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = heroTitle,
+                color = colors.textSecondary,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = heroValue,
+                color = heroValueColor ?: colors.textPrimary,
+                fontSize = 36.sp,
+                fontWeight = FontWeight.ExtraBold,
+                fontFamily = FontFamily.Monospace,
+                lineHeight = 40.sp
+            )
+            if (heroSub != null) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = heroSub,
+                    color = colors.textTertiary,
+                    fontSize = 11.5.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(colors.borderSubtle)
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // 统计卡片网格 (2列独立小方块微卡片)
+            val rows = stats.chunked(2)
+            rows.forEach { row ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    row.forEach { (label, value) ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(colors.bgInput.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                                .border(1.dp, colors.borderSubtle, RoundedCornerShape(10.dp))
+                                .padding(horizontal = 10.dp, vertical = 7.dp)
+                        ) {
+                            Column {
+                                Text(
+                                    text = label.uppercase(),
+                                    color = colors.textMuted,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.5.sp
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = value,
+                                    color = colors.textPrimary,
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                    if (row.size == 1) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+
+            if (actions != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                actions()
+            }
         }
     }
 }

@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -36,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,19 +56,20 @@ fun SymbolDropdownButton(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(48.dp)
-            .background(colors.bgInput, RoundedCornerShape(12.dp))
-            .border(1.dp, colors.borderSubtle, RoundedCornerShape(12.dp))
+            .height(44.dp)
+            .background(colors.bgInput, RoundedCornerShape(10.dp))
+            .border(1.dp, colors.borderSubtle, RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp),
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(
             text = symbol,
             color = colors.textPrimary,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
         )
         Icon(
             imageVector = Icons.Outlined.KeyboardArrowDown,
@@ -88,8 +93,9 @@ fun QuickSymbolBar(
             .background(colors.bgSurface)
             .border(width = 1.dp, color = colors.borderSubtle)
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         symbols.forEach { symbol ->
             val active = symbol == selected
@@ -97,21 +103,22 @@ fun QuickSymbolBar(
                 modifier = Modifier
                     .background(
                         if (active) colors.brand else colors.bgInput,
-                        RoundedCornerShape(20.dp)
+                        RoundedCornerShape(50)
                     )
                     .border(
                         1.dp,
                         if (active) colors.brand else colors.borderMedium,
-                        RoundedCornerShape(20.dp)
+                        RoundedCornerShape(50)
                     )
                     .clickable { onSelect(symbol) }
-                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                    .padding(horizontal = 12.dp, vertical = 5.dp)
             ) {
                 Text(
                     text = symbol,
                     color = if (active) androidx.compose.ui.graphics.Color.White else colors.textSecondary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                 )
             }
         }
@@ -225,32 +232,104 @@ fun SearchField(
     query: String,
     onQueryChange: (String) -> Unit,
     placeholder: String,
-    rootModifier: Modifier = Modifier
+    rootModifier: Modifier = Modifier,
+    isLoading: Boolean = false,
+    onSearch: ((String) -> Unit)? = null
 ) {
     val colors = ThrustTheme.colors
+    var isFocused by remember { mutableStateOf(false) }
+
+    val borderColor by androidx.compose.animation.animateColorAsState(
+        targetValue = if (isFocused) colors.brand else colors.borderSubtle,
+        animationSpec = androidx.compose.animation.core.spring(stiffness = 500f),
+        label = "search_border_color"
+    )
+    val borderWidth by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (isFocused) 1.5.dp else 1.dp,
+        animationSpec = androidx.compose.animation.core.spring(stiffness = 500f),
+        label = "search_border_width"
+    )
+    val bgColor by androidx.compose.animation.animateColorAsState(
+        targetValue = if (isFocused) colors.bgElevated else colors.bgInput,
+        animationSpec = androidx.compose.animation.core.spring(stiffness = 500f),
+        label = "search_bg_color"
+    )
+
     Row(
         modifier = rootModifier
             .fillMaxWidth()
             .height(44.dp)
-            .background(colors.bgInput, RoundedCornerShape(12.dp))
-            .border(1.dp, colors.borderSubtle, RoundedCornerShape(12.dp))
+            .background(bgColor, RoundedCornerShape(12.dp))
+            .border(borderWidth, borderColor, RoundedCornerShape(12.dp))
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.Outlined.Search, contentDescription = null, tint = colors.textTertiary, modifier = Modifier.size(18.dp))
+        IconButton(
+            onClick = { onSearch?.invoke(query) },
+            modifier = Modifier.size(24.dp)
+        ) {
+            Icon(
+                Icons.Outlined.Search,
+                contentDescription = "Search",
+                tint = if (isFocused || query.isNotBlank()) colors.brand else colors.textTertiary,
+                modifier = Modifier.size(18.dp)
+            )
+        }
         Box(modifier = Modifier.size(8.dp))
-        Box(modifier = Modifier.weight(1f)) {
-            if (query.isEmpty()) {
-                Text(placeholder, color = colors.textMuted, fontSize = 14.sp)
-            }
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            contentAlignment = Alignment.CenterStart
+        ) {
             androidx.compose.foundation.text.BasicTextField(
                 value = query,
                 onValueChange = onQueryChange,
                 singleLine = true,
-                textStyle = androidx.compose.ui.text.TextStyle(color = colors.textPrimary, fontSize = 14.sp),
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    color = colors.textPrimary,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)
+                ),
                 cursorBrush = androidx.compose.ui.graphics.SolidColor(colors.brand),
-                modifier = Modifier.fillMaxWidth()
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    imeAction = androidx.compose.ui.text.input.ImeAction.Search
+                ),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                    onSearch = { onSearch?.invoke(query) }
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { isFocused = it.isFocused },
+                decorationBox = { innerTextField ->
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        if (query.isEmpty()) {
+                            Text(
+                                text = placeholder,
+                                color = colors.textMuted,
+                                fontSize = 14.sp,
+                                lineHeight = 20.sp,
+                                style = androidx.compose.ui.text.TextStyle(
+                                    platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)
+                                )
+                            )
+                        }
+                        innerTextField()
+                    }
+                }
             )
+        }
+        if (isLoading) {
+            androidx.compose.material3.CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                strokeWidth = 2.dp,
+                color = colors.brand
+            )
+            Spacer(modifier = Modifier.size(6.dp))
         }
         if (query.isNotEmpty()) {
             IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(28.dp)) {

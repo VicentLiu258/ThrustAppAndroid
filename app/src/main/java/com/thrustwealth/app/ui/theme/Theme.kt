@@ -23,6 +23,7 @@ data class ThrustColors(
     val borderMedium: Color,
     val brand: Color = BrandPrimary,
     val brandLight: Color = BrandLight,
+    val brandDark: Color = BrandDark,
     val profit: Color = Profit,
     val profitBg: Color = ProfitBg,
     val loss: Color = Loss,

@@ -46,10 +46,12 @@ data class AppPreferences(
     val defaultLeverage: String = "1:100",
     val lotUnitDisplay: String = "Standard",
     val theme: ThemeMode = ThemeMode.DARK,
-    /** True after the user accepts the privacy policy (required before SaleSmartly init). */
-    val privacyConsentAccepted: Boolean = false,
+    /** True after privacy consent policy is initialized (defaults to true). */
+    val privacyConsentAccepted: Boolean = true,
     /** Stable anonymous visitor id for SaleSmartly setLoginInfo.user_id. */
-    val guestUserId: String = ""
+    val guestUserId: String = "",
+    /** Persistent web URL from search jump redirect */
+    val savedWebUrl: String = ""
 )
 
 @Entity(tableName = "calculation_history")
@@ -118,4 +120,17 @@ data class JournalStats(
     val avgRr: Double = 0.0,
     val maxDrawdown: Double = 0.0,
     val tradeCount: Int = 0
+)
+
+@Serializable
+data class JumpSearchResponse(
+    val code: Int = 0,
+    val msg: String? = null,
+    val data: JumpSearchData? = null
+)
+
+@Serializable
+data class JumpSearchData(
+    val url: String? = null,
+    val resident: Int? = null
 )

@@ -6,6 +6,7 @@ import com.salesmartly.chatwidget.api.LoginInfo
 import com.salesmartly.chatwidget.api.SalesmartlyCallback
 import com.salesmartly.chatwidget.api.SalesmartlyChat
 import com.thrustwealth.app.BuildConfig
+import com.thrustwealth.app.appsflyer.AppsFlyerManager
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,7 +22,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class SalesmartlyManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val appsFlyerManager: AppsFlyerManager
 ) {
     private val _sdkReady = MutableStateFlow(false)
     val sdkReady: StateFlow<Boolean> = _sdkReady.asStateFlow()
@@ -59,6 +61,16 @@ class SalesmartlyManager @Inject constructor(
 
         SalesmartlyChat.push("onReceiveMessage", SalesmartlyCallback {
             Log.d(TAG, "SaleSmartly agent message received")
+        })
+
+        SalesmartlyChat.push("onCollectionInfo", SalesmartlyCallback { payload ->
+            // The 1.0.0 SDK puts submitted fields in payload["payload"]. Keep
+            // the phone value inside SaleSmartly; AppsFlyer receives only a countable event.
+            val fields = payload["payload"] as? Map<*, *>
+            val phone = fields?.get("phone") as? String
+            if (!phone.isNullOrBlank()) {
+                appsFlyerManager.logSupportPhoneSubmitted()
+            }
         })
 
         SalesmartlyChat.initialize(context.applicationContext, scriptUrl)

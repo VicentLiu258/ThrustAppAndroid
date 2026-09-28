@@ -1,6 +1,7 @@
 package com.thrustwealth.app.ui.tools
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -44,7 +46,10 @@ fun ToolsScreen(
             .background(colors.bgApp)
     ) {
         AppTopBar(title = "Tools")
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             ToolCard(
                 icon = Icons.Outlined.AttachMoney,
                 title = "P/L Calculator",
@@ -61,8 +66,8 @@ fun ToolsScreen(
                 icon = Icons.Outlined.Calculate,
                 title = "Required Margin (V2.0)",
                 description = "Determine exact required margin and free margin leverage requirements.",
-                onClick = {},
-                enabled = false
+                enabled = false,
+                onClick = null
             )
             Spacer(modifier = Modifier.height(8.dp))
             ComplianceDisclaimer(
@@ -77,15 +82,23 @@ private fun ToolCard(
     icon: ImageVector,
     title: String,
     description: String,
-    onClick: () -> Unit,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    onClick: (() -> Unit)? = null
 ) {
     val colors = ThrustTheme.colors
+    val shape = RoundedCornerShape(16.dp)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(colors.bgElevated, RoundedCornerShape(14.dp))
-            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
+            .alpha(if (enabled) 1f else 0.6f)
+            .background(colors.bgSurface, shape)
+            .border(1.dp, colors.borderSubtle, shape)
+            .then(
+                if (enabled && onClick != null) {
+                    Modifier.clickable(onClick = onClick)
+                } else Modifier
+            )
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -93,15 +106,15 @@ private fun ToolCard(
             modifier = Modifier
                 .size(44.dp)
                 .background(
-                    if (enabled) colors.brand.copy(alpha = 0.15f) else colors.borderMedium,
+                    if (enabled) colors.brand.copy(alpha = 0.12f) else colors.bgInput,
                     RoundedCornerShape(12.dp)
                 ),
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                icon,
+                imageVector = icon,
                 contentDescription = null,
-                tint = if (enabled) colors.brand else colors.textMuted,
+                tint = if (enabled) colors.brand else colors.textTertiary,
                 modifier = Modifier.size(22.dp)
             )
         }
@@ -109,10 +122,11 @@ private fun ToolCard(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                color = if (enabled) colors.textPrimary else colors.textMuted,
+                color = colors.textPrimary,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 15.sp
             )
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = description,
                 color = colors.textTertiary,

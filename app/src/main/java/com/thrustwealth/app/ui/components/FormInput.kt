@@ -37,16 +37,17 @@ fun FormLabel(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = label,
-            color = colors.textSecondary,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
+            text = label.uppercase(),
+            color = colors.textTertiary,
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.5.sp,
             modifier = Modifier.weight(1f)
         )
         if (hint != null) {
             Text(
                 text = hint,
-                color = colors.textTertiary,
+                color = colors.textMuted,
                 fontSize = 11.sp
             )
         }
@@ -68,24 +69,24 @@ fun FormInput(
     Row(
         modifier = rootModifier
             .fillMaxWidth()
-            .height(48.dp)
-            .background(colors.bgInput, RoundedCornerShape(12.dp))
-            .border(1.dp, colors.borderSubtle, RoundedCornerShape(12.dp))
-            .padding(horizontal = 14.dp),
+            .height(44.dp)
+            .background(colors.bgInput, RoundedCornerShape(10.dp))
+            .border(1.dp, colors.borderSubtle, RoundedCornerShape(10.dp))
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (prefix != null) {
             Text(
                 text = prefix,
                 color = colors.textTertiary,
-                fontSize = 15.sp,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Medium
             )
             Box(modifier = Modifier.width(6.dp))
         }
         Box(modifier = Modifier.weight(1f)) {
             if (value.isEmpty() && placeholder.isNotEmpty()) {
-                Text(placeholder, color = colors.textMuted, fontSize = 15.sp)
+                Text(placeholder, color = colors.textMuted, fontSize = 14.sp)
             }
             BasicTextField(
                 value = value,
@@ -95,9 +96,9 @@ fun FormInput(
                 keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
                 textStyle = TextStyle(
                     color = colors.textPrimary,
-                    fontSize = 16.sp,
+                    fontSize = 15.sp,
                     fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.SemiBold
                 ),
                 cursorBrush = SolidColor(colors.brand),
                 modifier = Modifier.fillMaxWidth()
@@ -108,7 +109,7 @@ fun FormInput(
             Text(
                 text = suffix,
                 color = colors.textTertiary,
-                fontSize = 13.sp
+                fontSize = 12.5.sp
             )
         }
     }
@@ -123,7 +124,7 @@ fun FormGroup(
 ) {
     Column(modifier = rootModifier.fillMaxWidth()) {
         FormLabel(label = label, hint = hint)
-        Box(modifier = Modifier.height(6.dp))
+        Box(modifier = Modifier.height(4.dp))
         content()
     }
 }

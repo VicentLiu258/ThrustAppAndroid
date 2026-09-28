@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.Color
 // Brand
 val BrandPrimary = Color(0xFF19A492)
 val BrandPrimaryHover = Color(0xFF148374)
+val BrandDark = Color(0xFF0D7A6A)
 val BrandLight = Color(0xFF2DD4BF)
 val BrandNavy = Color(0xFF0F172A)
 

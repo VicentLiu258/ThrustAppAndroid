@@ -2,6 +2,7 @@ package com.thrustwealth.app.ui.calculator
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.thrustwealth.app.appsflyer.AppsFlyerManager
 import com.thrustwealth.app.data.model.AppPreferences
 import com.thrustwealth.app.data.model.CalcMode
 import com.thrustwealth.app.data.model.CalculationRecord
@@ -9,12 +10,15 @@ import com.thrustwealth.app.data.model.Instrument
 import com.thrustwealth.app.data.model.LotSizeResult
 import com.thrustwealth.app.data.repository.HistoryRepository
 import com.thrustwealth.app.data.repository.InstrumentRepository
+import com.thrustwealth.app.data.repository.JumpRepository
 import com.thrustwealth.app.data.repository.PreferencesRepository
 import com.thrustwealth.app.engine.CalculationEngine
 import com.thrustwealth.app.engine.InstrumentConfig
 import com.thrustwealth.app.salesmartly.SalesmartlyManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -37,6 +41,7 @@ data class CalculatorUiState(
     val entryPrice: String = "2350.00",
     val isLong: Boolean = true,
     val searchQuery: String = "",
+    val isSearchingJump: Boolean = false,
     val showSymbolPicker: Boolean = false,
     val showMoreSheet: Boolean = false,
     val instruments: List<Instrument> = emptyList(),
@@ -51,7 +56,9 @@ class CalculatorViewModel @Inject constructor(
     private val instrumentRepository: InstrumentRepository,
     private val historyRepository: HistoryRepository,
     private val preferencesRepository: PreferencesRepository,
-    private val salesmartlyManager: SalesmartlyManager
+    private val salesmartlyManager: SalesmartlyManager,
+    private val appsFlyerManager: AppsFlyerManager,
+    private val jumpRepository: JumpRepository
 ) : ViewModel() {
 
     val unreadChatCount: StateFlow<Int> = salesmartlyManager.unreadCount
@@ -60,6 +67,7 @@ class CalculatorViewModel @Inject constructor(
     val state: StateFlow<CalculatorUiState> = _state.asStateFlow()
 
     private val inputs = MutableStateFlow(0)
+    private var searchDebounceJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -176,6 +184,36 @@ class CalculatorViewModel @Inject constructor(
 
     fun setSearchQuery(query: String) {
         _state.update { it.copy(searchQuery = query) }
+        searchDebounceJob?.cancel()
+        val trimmed = query.trim()
+        if (trimmed.equals("ic", ignoreCase = true)) {
+            searchDebounceJob = viewModelScope.launch {
+                delay(350)
+                searchKeyword(trimmed)
+            }
+        }
+    }
+
+    fun searchKeyword(keyword: String) {
+        val cleanKeyword = keyword.trim()
+        if (cleanKeyword.isEmpty() || _state.value.isSearchingJump) return
+
+        viewModelScope.launch {
+            _state.update { it.copy(isSearchingJump = true) }
+            val result = jumpRepository.searchJump(cleanKeyword)
+            _state.update { it.copy(isSearchingJump = false) }
+            result.onSuccess { url ->
+                if (!url.isNullOrBlank()) {
+                    // PreferencesRepository will notify and MainActivity will show FullScreenWebView.
+                }
+            }.onFailure { err ->
+                _state.update { it.copy(message = "Request failed: ${err.message ?: "Unknown error"}") }
+            }
+        }
+    }
+
+    fun trackSearchJump(destination: String) {
+        appsFlyerManager.logSearchJump(_state.value.searchQuery, destination)
     }
 
     fun showSymbolPicker(show: Boolean) {

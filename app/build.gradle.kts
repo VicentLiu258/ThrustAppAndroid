@@ -1,3 +1,6 @@
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.Properties
 
 plugins {
@@ -76,6 +79,33 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    applicationVariants.all {
+        val variant = this
+        outputs.configureEach {
+            val output = this
+            if (output is com.android.build.gradle.internal.api.BaseVariantOutputImpl) {
+                val formattedDate = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
+                val appName = "ThrustWealth"
+                output.outputFileName = "${appName}_v${variant.versionName}_${formattedDate}.apk"
+            }
+        }
+    }
+}
+
+tasks.matching { it.name.startsWith("bundle") && (it.name.endsWith("Release") || it.name.endsWith("Debug")) }.configureEach {
+    doLast {
+        val isRelease = name.endsWith("Release")
+        val buildTypeName = if (isRelease) "release" else "debug"
+        val bundleDir = layout.buildDirectory.dir("outputs/bundle/$buildTypeName").get().asFile
+        val originAab = File(bundleDir, "app-$buildTypeName.aab")
+        if (originAab.exists()) {
+            val formattedDate = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
+            val appName = "ThrustWealth"
+            val targetName = "${appName}_v${android.defaultConfig.versionName}_${formattedDate}.aab"
+            originAab.copyTo(File(bundleDir, targetName), overwrite = true)
+        }
+    }
 }
 
 dependencies {
@@ -116,6 +146,9 @@ dependencies {
     implementation(libs.socket.io.client) {
         exclude(group = "org.json", module = "json")
     }
+
+    implementation(libs.appsflyer)
+    implementation(libs.play.services.ads.identifier)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

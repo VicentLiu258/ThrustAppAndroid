@@ -27,6 +27,7 @@ fun SegmentedControl(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    height: androidx.compose.ui.unit.Dp = 36.dp,
     selectedColor: Color? = null,
     selectedContentColor: Color = Color.White
 ) {
@@ -36,12 +37,13 @@ fun SegmentedControl(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(44.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .height(height)
+            .clip(RoundedCornerShape(10.dp))
             .background(colors.bgInput)
-            .border(1.dp, colors.borderSubtle, RoundedCornerShape(12.dp))
-            .padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
+            .border(1.dp, colors.borderSubtle, RoundedCornerShape(10.dp))
+            .padding(2.5.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         options.forEachIndexed { index, label ->
             val selected = index == selectedIndex
@@ -49,8 +51,8 @@ fun SegmentedControl(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .height(38.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .height(height - 5.dp)
+                    .clip(RoundedCornerShape(8.dp))
                     .background(if (selected) activeBg else Color.Transparent)
                     .clickable { onSelect(index) },
                 contentAlignment = Alignment.Center
@@ -61,8 +63,8 @@ fun SegmentedControl(
                         selected -> selectedContentColor
                         else -> colors.textSecondary
                     },
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                    fontSize = 13.sp
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    fontSize = 12.5.sp
                 )
             }
         }
@@ -81,6 +83,7 @@ fun DirectionSegmented(
         selectedIndex = if (isLong) 0 else 1,
         onSelect = { onChange(it == 0) },
         modifier = modifier,
+        height = 44.dp,
         selectedColor = if (isLong) colors.profit else colors.loss
     )
 }

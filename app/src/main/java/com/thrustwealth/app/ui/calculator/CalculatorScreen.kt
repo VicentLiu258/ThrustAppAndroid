@@ -2,6 +2,7 @@ package com.thrustwealth.app.ui.calculator
 
 import android.widget.Toast
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -24,6 +26,10 @@ import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.SupportAgent
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -36,7 +42,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import com.thrustwealth.app.R
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -77,11 +87,6 @@ fun CalculatorScreen(
     val instrument = viewModel.currentInstrument()
     val currency = state.preferences.accountCurrency
 
-    val fabBottomPadding by animateDpAsState(
-        targetValue = if (state.searchQuery.isBlank()) 68.dp else 20.dp,
-        label = "chat_fab_bottom_padding"
-    )
-
     LaunchedEffect(state.message) {
         state.message?.let {
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
@@ -89,69 +94,106 @@ fun CalculatorScreen(
         }
     }
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(colors.bgApp)
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
+        // App Bar: 对齐原型, 纯正矢量Logo + 右侧动作按钮
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // App Bar
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Thrust Wealth",
-                    color = BrandPrimary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(onClick = onOpenHistory) {
-                    Icon(Icons.Outlined.History, contentDescription = "History", tint = colors.textPrimary)
-                }
-                IconButton(onClick = { viewModel.saveRecord() }) {
-                    Icon(Icons.Outlined.BookmarkBorder, contentDescription = "Save", tint = colors.textPrimary)
-                }
-                IconButton(onClick = { viewModel.showMoreSheet(true) }) {
-                    Icon(Icons.Outlined.MoreVert, contentDescription = "More", tint = colors.textPrimary)
+            Image(
+                painter = painterResource(com.thrustwealth.app.R.drawable.ic_app_logo),
+                contentDescription = "Thrust Wealth",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.height(26.dp)
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            IconButton(onClick = onOpenHistory) {
+                Icon(Icons.Outlined.History, contentDescription = "History", tint = colors.textPrimary)
+            }
+            IconButton(onClick = { viewModel.saveRecord() }) {
+                Icon(Icons.Outlined.BookmarkBorder, contentDescription = "Save", tint = colors.textPrimary)
+            }
+            // 客服入口: 融入顶部Header, 不遮挡输入框或结果卡
+            IconButton(onClick = onOpenChat) {
+                BadgedBox(
+                    badge = {
+                        if (unreadCount > 0) {
+                            Badge(
+                                containerColor = colors.brand,
+                                contentColor = Color.White
+                            ) {
+                                Text("$unreadCount", fontSize = 9.sp)
+                            }
+                        }
+                    }
+                ) {
+                    Icon(
+                        Icons.Outlined.SupportAgent,
+                        contentDescription = "Customer Support",
+                        tint = colors.textPrimary
+                    )
                 }
             }
+            IconButton(onClick = { viewModel.showMoreSheet(true) }) {
+                Icon(Icons.Outlined.MoreVert, contentDescription = "More", tint = colors.textPrimary)
+            }
+        }
 
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp)
-            ) {
+        // 紧凑排版的计算器滚动区域: 保证首屏露出结果卡与主数值
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 14.dp)
+        ) {
+            Spacer(modifier = Modifier.height(4.dp))
             SearchField(
                 query = state.searchQuery,
                 onQueryChange = viewModel::setSearchQuery,
-                placeholder = "Search tools (P/L, Specs, Journal)..."
+                placeholder = "Search tools (P/L, Specs, Journal)...",
+                isLoading = state.isSearchingJump,
+                onSearch = { query ->
+                    viewModel.searchKeyword(query)
+                }
             )
 
             if (state.searchQuery.isNotBlank()) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 SearchResults(
                     query = state.searchQuery,
-                    onPnl = onOpenPnl,
-                    onSpecs = onOpenSpecs,
-                    onJournal = onOpenJournal
+                    onSearch = { query ->
+                        viewModel.searchKeyword(query)
+                    },
+                    onPnl = {
+                        viewModel.trackSearchJump("pnl")
+                        onOpenPnl()
+                    },
+                    onSpecs = {
+                        viewModel.trackSearchJump("specs")
+                        onOpenSpecs()
+                    },
+                    onJournal = {
+                        viewModel.trackSearchJump("journal")
+                        onOpenJournal()
+                    }
                 )
             } else {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 SegmentedControl(
                     options = listOf("By Risk", "By Lots"),
                     selectedIndex = if (state.mode == CalcMode.BY_RISK) 0 else 1,
-                    onSelect = { viewModel.setMode(if (it == 0) CalcMode.BY_RISK else CalcMode.BY_LOTS) }
+                    onSelect = { viewModel.setMode(if (it == 0) CalcMode.BY_RISK else CalcMode.BY_LOTS) },
+                    height = 34.dp
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 FormGroup(
                     label = "Instrument / Symbol",
                     hint = instrument?.let { "Contract: ${it.contractSize.toInt()} ${it.unit} / lot" }
@@ -162,7 +204,7 @@ fun CalculatorScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 FormGroup(label = "Account Balance", hint = "Base Currency: $currency") {
                     FormInput(
                         value = state.balance,
@@ -172,8 +214,8 @@ fun CalculatorScreen(
                 }
 
                 if (state.mode == CalcMode.BY_RISK) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FormGroup(label = "Risk %", rootModifier = Modifier.weight(1f)) {
                             FormInput(
                                 value = state.riskPercent,
@@ -189,35 +231,36 @@ fun CalculatorScreen(
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         listOf(0.5, 1.0, 2.0, 3.0).forEach { preset ->
                             val active = state.riskPercent.toDoubleOrNull() == preset
                             Box(
                                 modifier = Modifier
                                     .background(
                                         if (active) colors.brand else colors.bgInput,
-                                        RoundedCornerShape(20.dp)
+                                        RoundedCornerShape(50)
                                     )
                                     .border(
                                         1.dp,
                                         if (active) colors.brand else colors.borderMedium,
-                                        RoundedCornerShape(20.dp)
+                                        RoundedCornerShape(50)
                                     )
                                     .clickable { viewModel.setPresetRisk(preset) }
-                                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                                    .padding(horizontal = 12.dp, vertical = 5.dp)
                             ) {
                                 Text(
                                     text = "${preset}%",
                                     color = if (active) Color.White else colors.textSecondary,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                                 )
                             }
                         }
                     }
                 } else {
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     FormGroup(label = "Lot Size", hint = "Standard Lots") {
                         FormInput(
                             value = state.lotSize,
@@ -227,7 +270,7 @@ fun CalculatorScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 FormGroup(
                     label = "Stop Loss (Pips)",
                     hint = instrument?.let { "1 pip = ${it.pipSize}" }
@@ -239,8 +282,8 @@ fun CalculatorScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FormGroup(label = "Entry Price", hint = "Optional", rootModifier = Modifier.weight(1f)) {
                         FormInput(
                             value = state.entryPrice,
@@ -255,7 +298,7 @@ fun CalculatorScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 val result = state.result
                 val heroValue = if (result.isValid) {
                     "${FormatUtils.formatLots(result.suggestedLots)} Lots"
@@ -279,7 +322,7 @@ fun CalculatorScreen(
                             result.stopLossPrice?.let {
                                 "${FormatUtils.formatPrice(it, digits)} (${if (state.isLong) "Long" else "Short"})"
                             } ?: "—"
-                            )
+                        )
                     ),
                     actions = {
                         ResultActions(
@@ -303,12 +346,13 @@ fun CalculatorScreen(
                     }
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 ComplianceDisclaimer()
-                Spacer(modifier = Modifier.height(80.dp))
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
 
+        // 快捷品种栏: 固定停靠在底部导航栏上方, 绝对不遮盖上方滚动的卡片
         if (state.searchQuery.isBlank()) {
             QuickSymbolBar(
                 symbols = InstrumentConfig.QUICK_SYMBOLS,
@@ -317,16 +361,6 @@ fun CalculatorScreen(
             )
         }
     }
-
-    // 首页客服聊天悬浮入口
-    ChatFloatingActionButton(
-        onClick = onOpenChat,
-        unreadCount = unreadCount,
-        modifier = Modifier
-            .align(Alignment.BottomEnd)
-            .padding(end = 16.dp, bottom = fabBottomPadding)
-    )
-}
 
     if (state.showSymbolPicker) {
         SymbolPickerSheet(
@@ -376,6 +410,10 @@ fun CalculatorScreen(
                     )
                     viewModel.showMoreSheet(false)
                 }
+                SheetAction("Customer Support") {
+                    onOpenChat()
+                    viewModel.showMoreSheet(false)
+                }
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
@@ -385,11 +423,13 @@ fun CalculatorScreen(
 @Composable
 private fun SearchResults(
     query: String,
+    onSearch: (String) -> Unit,
     onPnl: () -> Unit,
     onSpecs: () -> Unit,
     onJournal: () -> Unit
 ) {
     val colors = ThrustTheme.colors
+    val trimmed = query.trim()
     val tools = listOf(
         Triple("P/L Calculator", "Profit / loss by open & close", onPnl),
         Triple("Market Specs", "Contract size & pip value", onSpecs),
@@ -398,20 +438,47 @@ private fun SearchResults(
         it.first.contains(query, true) || it.second.contains(query, true)
     }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (tools.isEmpty()) {
-            Text("No tools found", color = colors.textTertiary, fontSize = 13.sp)
-        } else {
-            tools.forEach { (title, desc, action) ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(colors.bgElevated, RoundedCornerShape(12.dp))
-                        .clickable(onClick = action)
-                        .padding(14.dp)
-                ) {
-                    Text(title, color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
-                    Text(desc, color = colors.textTertiary, fontSize = 12.sp)
-                }
+        // Direct search option
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(colors.bgElevated, RoundedCornerShape(12.dp))
+                .clickable { onSearch(trimmed) }
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Outlined.Search,
+                contentDescription = null,
+                tint = colors.brand,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.size(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Search \"$trimmed\"",
+                    color = colors.textPrimary,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp
+                )
+                Text(
+                    text = "Query remote service & matching features",
+                    color = colors.textTertiary,
+                    fontSize = 12.sp
+                )
+            }
+        }
+
+        tools.forEach { (title, desc, action) ->
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.bgElevated, RoundedCornerShape(12.dp))
+                    .clickable(onClick = action)
+                    .padding(14.dp)
+            ) {
+                Text(title, color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
+                Text(desc, color = colors.textTertiary, fontSize = 12.sp)
             }
         }
     }
