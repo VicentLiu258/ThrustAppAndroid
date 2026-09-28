@@ -83,6 +83,7 @@ import com.thrustwealth.app.BuildConfig
 import com.thrustwealth.app.data.repository.PreferencesRepository
 import com.thrustwealth.app.salesmartly.SalesmartlyManager
 import com.thrustwealth.app.ui.components.AppTopBar
+import com.thrustwealth.app.ui.components.ChannelIcon
 import com.thrustwealth.app.ui.components.resolveChannelMetadata
 import com.thrustwealth.app.ui.theme.ThrustTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -220,24 +221,6 @@ fun ChatScreen(
                         viewModel.backToChannels()
                     } else {
                         onBack()
-                    }
-                },
-                actions = {
-                    // 顶栏模式切换按钮（原生模式 Native Mode / 官方网页模式 Web Mode）
-                    Box(
-                        modifier = Modifier
-                            .padding(end = 8.dp)
-                            .background(colors.bgElevated, RoundedCornerShape(12.dp))
-                            .border(1.dp, colors.borderSubtle, RoundedCornerShape(12.dp))
-                            .clickable { useWebMode = !useWebMode }
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = if (useWebMode) "Web Mode" else "Native Mode",
-                            color = colors.brand,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
-                        )
                     }
                 }
             )
@@ -575,11 +558,10 @@ private fun NativeSupportChannelView(
                                     .background(meta.brandColor),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = meta.badgeLetter,
-                                    color = Color.White,
-                                    fontSize = if (meta.badgeLetter.length > 1) 14.sp else 18.sp,
-                                    fontWeight = FontWeight.Bold
+                                ChannelIcon(
+                                    channel = channel,
+                                    meta = meta,
+                                    iconSize = 22.dp
                                 )
                             }
 

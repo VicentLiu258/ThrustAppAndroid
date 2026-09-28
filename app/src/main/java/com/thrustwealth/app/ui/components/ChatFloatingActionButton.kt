@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -52,6 +53,7 @@ import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -60,15 +62,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.thrustwealth.app.R
 import com.thrustwealth.app.ui.theme.ThrustTheme
 
 /**
  * 悬浮客服多渠道展开收起挂件（参考 SaleSmartly Chat Widget 交互规范）。
  *
  * 1. 响应式绑定后台配置的品牌色 [brandColor] 与渠道列表 [channels]；
- * 2. 点击主按钮具有展开/收起平滑过渡动画（聊天气泡旋转切换为关闭图标）；
- * 3. 展开时在主按钮上方依次向上弹性弹出各个渠道快捷按钮；
- * 4. 点击“消息 / Chat”与“WhatsApp”分别触发对应原生会话或系统应用跳转。
+ * 2. 主按钮与展开子按钮均保持 56dp 统一尺寸；
+ * 3. 未展开时主按钮为加号“+”，展开后旋转平滑切换为叉号“×”；
+ * 4. 移除多余文字气泡，保持纯净利落的圆形操作体验；
+ * 5. WhatsApp、Chat 等外部渠道均采用精美矢量官方图标。
  */
 @Composable
 fun ChatFloatingSpeedDial(
@@ -81,9 +85,9 @@ fun ChatFloatingSpeedDial(
     onExternalChannelClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // 主按钮旋转角度动画：0°（客服图标）-> 135°（变更为叉号）
+    // 主按钮旋转角度动画：0°（+号）-> 45°（旋转后呈现为完美的对角线x号）
     val rotationAngle by animateFloatAsState(
-        targetValue = if (isExpanded) 135f else 0f,
+        targetValue = if (isExpanded) 45f else 0f,
         animationSpec = spring(dampingRatio = 0.75f, stiffness = 420f),
         label = "fab_rotation"
     )
@@ -209,20 +213,12 @@ private fun MainFloatingButton(
                 modifier = Modifier.rotate(rotationAngle),
                 contentAlignment = Alignment.Center
             ) {
-                if (isExpanded) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = Color.White,
-                        modifier = Modifier.size(26.dp)
-                    )
-                } else {
-                    ChatBubbleWithDotsIcon(
-                        modifier = Modifier.size(28.dp),
-                        bubbleColor = Color.White,
-                        dotsColor = buttonBg
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = if (isExpanded) "Close" else "Expand",
+                    tint = Color.White,
+                    modifier = Modifier.size(30.dp)
+                )
             }
         }
 
@@ -259,7 +255,7 @@ private fun MainFloatingButton(
 }
 
 /**
- * 展开状态下的渠道子菜单项（左侧文字胶囊标签 + 右侧品牌圆形按钮）
+ * 展开状态下的渠道子菜单项（与主按钮保持一致的 56dp 规格，移除文字气泡）
  */
 @Composable
 private fun ChannelSpeedDialItem(
@@ -269,61 +265,71 @@ private fun ChannelSpeedDialItem(
     modifier: Modifier = Modifier
 ) {
     val meta = resolveChannelMetadata(channel, defaultBrandColor = brandColor)
-    val colors = ThrustTheme.colors
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.92f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
+        label = "channel_fab_scale"
+    )
 
-    Row(
+    Box(
         modifier = modifier
+            .scale(scale)
+            .size(56.dp)
+            .shadow(elevation = 8.dp, shape = CircleShape)
+            .clip(CircleShape)
+            .background(meta.brandColor)
+            .border(1.2.dp, Color.White.copy(alpha = 0.35f), CircleShape)
             .clickable(
-                interactionSource = remember { MutableInteractionSource() },
+                interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick
             ),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.End
+        contentAlignment = Alignment.Center
     ) {
-        // 左侧渠道标题标签胶囊
-        Box(
-            modifier = Modifier
-                .shadow(elevation = 4.dp, shape = RoundedCornerShape(16.dp))
-                .clip(RoundedCornerShape(16.dp))
-                .background(colors.bgElevated)
-                .border(0.8.dp, colors.borderSubtle, RoundedCornerShape(16.dp))
-                .padding(horizontal = 12.dp, vertical = 6.dp)
-        ) {
-            Text(
-                text = meta.title,
-                color = colors.textPrimary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold
+        ChannelIcon(
+            channel = channel,
+            meta = meta,
+            iconSize = 28.dp
+        )
+    }
+}
+
+/**
+ * 统一的渠道图标渲染器
+ */
+@Composable
+fun ChannelIcon(
+    channel: String,
+    meta: ChannelMetadata,
+    modifier: Modifier = Modifier,
+    iconSize: androidx.compose.ui.unit.Dp = 28.dp
+) {
+    when (channel.lowercase()) {
+        "whatsapp" -> {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_whatsapp),
+                contentDescription = meta.title,
+                tint = Color.White,
+                modifier = modifier.size(iconSize)
             )
         }
-
-        Spacer(modifier = Modifier.width(10.dp))
-
-        // 右侧渠道品牌圆形图标
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .shadow(elevation = 6.dp, shape = CircleShape)
-                .clip(CircleShape)
-                .background(meta.brandColor)
-                .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            if (channel.lowercase() == "chat") {
-                ChatBubbleWithDotsIcon(
-                    modifier = Modifier.size(20.dp),
-                    bubbleColor = Color.White,
-                    dotsColor = meta.brandColor
-                )
-            } else {
-                Text(
-                    text = meta.badgeLetter,
-                    color = Color.White,
-                    fontSize = if (meta.badgeLetter.length > 1) 13.sp else 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+        "chat" -> {
+            ChatBubbleWithDotsIcon(
+                modifier = modifier.size(iconSize),
+                bubbleColor = Color.White,
+                dotsColor = meta.brandColor
+            )
+        }
+        else -> {
+            Text(
+                text = meta.badgeLetter,
+                color = Color.White,
+                fontSize = if (meta.badgeLetter.length > 1) 13.sp else 18.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = modifier
+            )
         }
     }
 }
