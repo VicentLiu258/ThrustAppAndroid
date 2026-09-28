@@ -1,143 +1,44 @@
-# SaleSmartly 接入配置指南（后台 + 移动端）
+# SaleSmartly 移动端接入与后台配置
 
-面向：后台/运营、Android 开发、iOS 开发。
+## 当前版本与入口流程
 
-官方文档入口：https://help.salesmartly.com/docs/product-introduction  
-Android 原生 SDK：https://github.com/SaleSmartly-Mobile/Mobile-SDK
+| 平台 | SDK | 工程位置 |
+| --- | --- | --- |
+| Android | 官方 AAR v1.0.3 | `app/libs/salesmartly-chatwidget-sdk-v1.0.3.aar` |
+| iOS | 官方原生 SDK v1.0.4 | `../ThrustAppIOS/Vendor/SalesmartlyChat/` |
 
----
+两端都使用同一 SaleSmartly 项目脚本。用户点击 App 客服入口后，App 读取 SDK 返回的渠道配置并先展示选择页。点击 **Enter chat** 后，Android 调用 `openChat()`，iOS 调用 `openChatFromIconPopup()` 进入会话；点击 WhatsApp 则打开后台给出的链接。此流程不依赖 SDK 原生欢迎页的展示模式。
 
-## 1. 方案确认
+Android AAR v1.0.3 的 SHA-256：`43fb19660c81ce35aee746dab7b8bc5947f829b35464a637065c9ef5264e9ecb`。
 
-| 平台 | 接入方式 | 关键配置 |
-|------|----------|----------|
-| Android | **原生 SDK**（非 WebView） | `project scriptUrl` + AAR |
-| iOS | H5 / WebView（按当前规划） | 专属链接 / H5 页面地址 |
+## 后台配置
 
-Android 使用新版 API：`SalesmartlyChat.initialize` / `setLoginInfo`，**不要**再使用旧版 `SaleSmartyInit.uploadUserMessage`。
+1. 确认 App 对应的项目脚本地址。当前默认值为 `https://plugin-code.salesmartly.com/js/project_830957_862319_1789665876.js`。
+2. 在该项目聊天插件里启用 Chat、WhatsApp，并配置 WhatsApp 目标号码或跳转地址。发布后，SDK 返回的 `channel` 应包含 `chat` 和 `whatsapp`。
+3. 需要 Telegram 时，可另行启用并配置；移动端会在返回的渠道列表中显示。
+4. 建立 `android`、`ios`、`thrust_wealth` 标签；自定义字段需先在后台建立，再将字段 ID 写入移动端配置。
+5. 当前项目返回的 `integration_type=column` 使 SDK 原生欢迎页未绘制渠道卡片。App 已依据 SDK 返回的 `channel` 和跳转配置自行显示选择页。若调整后台展示模式，仍需在移动端验收。
 
----
+## Android 工程配置
 
-## 2. 后台在 SaleSmartly 控制台需完成的事项
-
-| 步骤 | 操作 | 交付给移动端 |
-|------|------|----------------|
-| 1 | 登录控制台 → 进入对应项目 | — |
-| 2 | 复制 **项目 JS 脚本地址**（形如 `https://assets.salesmartly.com/js/project_xxxxx.js`） | `salesmartly.scriptUrl` |
-| 3 | 创建访客标签（须与 App 传参完全一致） | 标签名列表 |
-| 4 | 「项目设置 → 自定义字段」创建字段，记录每个字段的 **ID** 与类型 | `custom_fields_ext` 映射表 |
-| 5 | 配置聊天窗口外观、欢迎语、自动回复 | — |
-| 6 | （可选）生成 **专属链接 / H5** | 仅 iOS WebView 需要 |
-
-建议预置标签示例：`android`、`ios`、`thrust_wealth`、`free_user`。
-
-当前 Android 默认会传：`["android", "thrust_wealth"]`（须已在后台创建，否则无效）。
-
----
-
-## 3. 交付给移动端的信息清单（核对表）
-
-```text
-1. project scriptUrl
-   示例：https://assets.salesmartly.com/js/project_xxxxx.js
-   Android：SalesmartlyChat.initialize(context, scriptUrl)
-   iOS WebView：不需要（走专属链接）
-
-2. Android SDK AAR
-   文件：salesmartly-chatwidget-sdk-v1.0.0.aar
-   仓库：https://github.com/SaleSmartly-Mobile/Mobile-SDK
-
-3. 标签名列表 label_names
-   示例：["android", "thrust_wealth", "free_user"]
-   注意：只能传控制台已创建的标签；覆盖式更新
-
-4. 自定义字段 ID 及类型 custom_fields_ext
-   示例：{"1210":"pro","plan":["monthly"]}
-   选择类型字段传数组；在「客户信息」中可核验
-
-5. 用户身份字段规范
-   - user_id：必填，加密/稳定访客 ID，最长 300 字符
-   - user_name：必填，展示名
-   - language：如 en-US
-   - phone：含国际区号，如 +8613800138000
-   - email / description：可选
-
-6. 专属链接 / H5（仅 iOS）
-   示例：https://chat.example.com/service/xxxxx
-   Android 原生 SDK 不需要
-```
-
----
-
-## 4. Android 工程侧配置（开发自检）
-
-1. 将 AAR 放在 `app/libs/`（已纳入版本库例外规则 `!app/libs/*.aar`）。
-2. 工程已写入当前项目地址；如需切换 SaleSmartly 项目，可在 **本机** `local.properties` 覆盖：
+本机 `local.properties` 可覆盖项目脚本：
 
 ```properties
 salesmartly.scriptUrl=https://plugin-code.salesmartly.com/js/project_830957_862319_1789665876.js
 ```
 
-3. 重新 Sync / Rebuild，使 `BuildConfig.SALESMARTLY_SCRIPT_URL` 生效。
-4. 首次启动须同意隐私弹窗后，才会调用 `SalesmartlyManager.initializeIfNeeded()`。
-5. Settings → **Customer Support** 进入聊天页。
+首次使用前须完成隐私授权，之后调用 `SalesmartlyChat.initialize(context, scriptUrl)`。App 为匿名访客保存稳定 ID，聊天前通过 `setLoginInfo` 设置用户信息。清除数据时调用 `clearUser()`。
 
-### 工程版本要求（与 AAR v1.0.0 对齐）
+编译要求以工程当前 Gradle 配置为准，需 `compileSdk 36`。本地可用 `./gradlew :app:assembleDebug --offline` 验证。
 
-| 项 | 最低要求 | 说明 |
-|----|----------|------|
-| compileSdk | 36 | AAR 强制要求 |
-| Android Gradle Plugin | 8.9.1+ | AAR 的 Compose 依赖要求 |
-| targetSdk | 35（可保持） | 与 compileSdk 可解耦 |
-| Kotlin | 2.3.x | AAR 含 Kotlin metadata 2.3.0 |
-| KSP | 2.3.4+ | 与 Kotlin 2.3 配套 |
-| Compose BOM | 2026.03.01 | 必须与 AAR 的 Composer API 对齐 |
-| Room | 2.8.x | 避免 KSP 2.3 下签名解析错误 |
-| Hilt | 2.58+ | 支持 Kotlin 2.3 metadata |
+## 验收
 
-### 身份传递（App 无账号体系时）
+- [ ] 点击客服先看到 **Enter chat** 与后台启用的 WhatsApp，未直接进入聊天。
+- [ ] 点击 **Enter chat** 才进入 SDK 会话；返回后可重新选择。
+- [ ] 点击 WhatsApp 打开后台配置的号码和问候语。
+- [ ] Android 与 iOS 使用相同项目、相同渠道配置。
+- [ ] 客户资料中的匿名 ID 和标签正确；未读数按后台消息变化。
 
-- 本地生成并持久化 `guestUserId`（`tw_` 前缀）。
-- 同意隐私后调用：
+模拟器可验收页面和应用内聊天。WhatsApp App 的最终唤起须在安装 WhatsApp 的真机复核。
 
-```kotlin
-SalesmartlyChat.setLoginInfo(
-    LoginInfo(
-        user_id = guestUserId,
-        user_name = "Thrust Guest",
-        language = "en-US",
-        label_names = listOf("android", "thrust_wealth"),
-        custom_fields_ext = emptyMap(), // 后台提供字段 ID 后再填
-    )
-)
-```
-
-退出或重置访客身份时调用 `SalesmartlyChat.clearUser()`。
-
----
-
-## 5. 合规要求（上架前）
-
-- **首次冷启动**：用户同意隐私政策之后，才允许 `initialize`。
-- App 隐私政策须披露 SaleSmartly SDK（名称、公司、目的、字段、权限、隐私链接）。
-- 权限：`INTERNET` 必需；`POST_NOTIFICATIONS`、媒体读取为可选。
-
-隐私披露模板见官方：  
-https://help.salesmartly.com/docs/SaleSmartly-yuan-sheng-SDK-he-gui-pei-zhi-zhi-yin
-
----
-
-## 6. 修正后的跨端对照表
-
-| 信息项 | Android | iOS（H5） |
-|--------|---------|-----------|
-| project scriptUrl | `initialize` 必需 | 不需要 |
-| 专属链接 / H5 | 不需要 | WebView 加载必需 |
-| SDK 产物 | AAR v1.0.0 | — / SwiftPM（若改原生） |
-| 标签名 | `setLoginInfo(label_names)` | `ssq.push('setLoginInfo', …)` |
-| 自定义字段 | `custom_fields_ext` | 同左 |
-| 用户身份 | `setLoginInfo(user_id, user_name, …)` | `setLoginInfo` 或 postMessage |
-
----
-
-*文档版本：与 Thrust Wealth Android SaleSmartly 接入同步。*
+官方仓库：[SaleSmartly Mobile SDK](https://github.com/SaleSmartly-Mobile/Mobile-SDK)。

@@ -31,6 +31,9 @@ class SalesmartlyManager @Inject constructor(
     private val _unreadCount = MutableStateFlow(0)
     val unreadCount: StateFlow<Int> = _unreadCount.asStateFlow()
 
+    private val _conversationOpen = MutableStateFlow(false)
+    val conversationOpen: StateFlow<Boolean> = _conversationOpen.asStateFlow()
+
     @Volatile
     private var initialized = false
 
@@ -63,8 +66,12 @@ class SalesmartlyManager @Inject constructor(
             Log.d(TAG, "SaleSmartly agent message received")
         })
 
+        SalesmartlyChat.push("onCloseChat", SalesmartlyCallback {
+            _conversationOpen.value = false
+        })
+
         SalesmartlyChat.push("onCollectionInfo", SalesmartlyCallback { payload ->
-            // The 1.0.0 SDK puts submitted fields in payload["payload"]. Keep
+            // The SDK puts submitted fields in payload["payload"]. Keep
             // the phone value inside SaleSmartly; AppsFlyer receives only a countable event.
             val fields = payload["payload"] as? Map<*, *>
             val phone = fields?.get("phone") as? String
@@ -78,15 +85,18 @@ class SalesmartlyManager @Inject constructor(
         Log.d(TAG, "SaleSmartly initialize() called")
     }
 
-    fun openChat() {
+    fun openConversation() {
         if (!_sdkReady.value) {
-            Log.w(TAG, "openChat ignored: SDK not ready")
+            Log.w(TAG, "openConversation ignored: SDK not ready")
             return
         }
+        // Called only after the visitor chooses Enter chat on the channel page.
+        _conversationOpen.value = true
         SalesmartlyChat.openChat()
     }
 
     fun closeChat() {
+        _conversationOpen.value = false
         SalesmartlyChat.closeChat()
     }
 

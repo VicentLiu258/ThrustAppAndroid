@@ -29,7 +29,7 @@ val salesmartlyScriptUrl = configuredSalesmartlyScriptUrl.ifBlank {
 
 android {
     namespace = "com.thrustwealth.app"
-    // SaleSmartly chatwidget-sdk-v1.0.0 requires compileSdk 36+
+    // SaleSmartly chatwidget-sdk-v1.0.3 requires compileSdk 36+
     compileSdk = 36
 
     defaultConfig {
@@ -139,7 +139,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     // SaleSmartly Chat SDK (local AAR + transitive deps)
-    implementation(files("libs/salesmartly-chatwidget-sdk-v1.0.0.aar"))
+    implementation(files("libs/salesmartly-chatwidget-sdk-v1.0.3.aar"))
     implementation(libs.okhttp)
     implementation(libs.retrofit)
     implementation(libs.retrofit.kotlinx.serialization)

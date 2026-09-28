@@ -1,25 +1,34 @@
 package com.thrustwealth.app.ui.chat
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -35,6 +44,7 @@ import com.thrustwealth.app.ui.components.AppTopBar
 import com.thrustwealth.app.ui.theme.ThrustTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -47,18 +57,19 @@ class ChatViewModel @Inject constructor(
     val sdkReady = salesmartlyManager.sdkReady
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
-    val preferences = preferencesRepository.preferences
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    val conversationOpen = salesmartlyManager.conversationOpen
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val scriptConfigured: Boolean
         get() = BuildConfig.SALESMARTLY_SCRIPT_URL.isNotBlank()
 
-    fun ensureIdentityAndOpen() {
+    fun enterConversation() {
         viewModelScope.launch {
-            if (preferences.value?.privacyConsentAccepted != true) {
+            val preferences = preferencesRepository.preferences.first()
+            if (!preferences.privacyConsentAccepted) {
                 preferencesRepository.acceptPrivacyConsent()
             }
-            val userId = preferences.value?.guestUserId?.takeIf { it.isNotBlank() }
+            val userId = preferences.guestUserId.takeIf { it.isNotBlank() }
                 ?: preferencesRepository.ensureGuestUserId()
             salesmartlyManager.setLoginInfo(
                 userId = userId,
@@ -67,8 +78,29 @@ class ChatViewModel @Inject constructor(
                 description = "Thrust Wealth App User",
                 labelNames = SalesmartlyManager.DEFAULT_LABELS,
             )
-            salesmartlyManager.openChat()
+            salesmartlyManager.openConversation()
         }
+    }
+
+    fun backToChannels() = salesmartlyManager.closeChat()
+
+    fun externalChannelUrl(channel: String): String? {
+        val info = salesmartlyManager.runtime().state.value.widgetInfo
+        if (channel !in info.channel) return null
+        val rawUrl = when (channel) {
+            "whatsapp" -> info.show_whatsapp_config.redirect_url
+            "telegram" -> info.show_telegram_config.redirect_url
+            else -> return null
+        }
+        val uri = Uri.parse(rawUrl)
+        if (uri.scheme != "https") return null
+        if (channel == "whatsapp") {
+            val greeting = info.show_whatsapp_config.prolusion
+            if (greeting.isNotBlank()) {
+                return uri.buildUpon().appendQueryParameter("text", greeting).build().toString()
+            }
+        }
+        return rawUrl
     }
 
     fun runtime() = salesmartlyManager.runtime()
@@ -80,16 +112,10 @@ fun ChatScreen(
     viewModel: ChatViewModel = hiltViewModel()
 ) {
     val colors = ThrustTheme.colors
+    val context = LocalContext.current
     val sdkReady by viewModel.sdkReady.collectAsState()
-    val prefs by viewModel.preferences.collectAsState()
-    var openedOnce by remember { mutableStateOf(false) }
-
-    LaunchedEffect(sdkReady, prefs?.guestUserId) {
-        if (!openedOnce && sdkReady && prefs != null) {
-            openedOnce = true
-            viewModel.ensureIdentityAndOpen()
-        }
-    }
+    val conversationOpen by viewModel.conversationOpen.collectAsState()
+    val sdkState by viewModel.runtime().state.collectAsState()
 
     Column(
         modifier = Modifier
@@ -98,7 +124,10 @@ fun ChatScreen(
             .navigationBarsPadding()
             .imePadding()
     ) {
-        AppTopBar(title = "Customer Support", onBack = onBack)
+        AppTopBar(
+            title = "Customer Support",
+            onBack = if (conversationOpen) viewModel::backToChannels else onBack
+        )
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -121,13 +150,106 @@ fun ChatScreen(
                         Text("Connecting to support…", color = colors.textSecondary, fontSize = 14.sp)
                     }
                 }
-                else -> {
+                conversationOpen -> {
                     SalesmartlyChatHost(
                         runtime = viewModel.runtime(),
                         modifier = Modifier.fillMaxSize()
                     )
                 }
+                else -> {
+                    SupportChannelChoice(
+                        name = "thrustwealth",
+                        channels = sdkState.widgetInfo.channel.filter {
+                            it == "chat" || it == "whatsapp" || it == "telegram"
+                        },
+                        onChat = viewModel::enterConversation,
+                        onExternal = { channel ->
+                            viewModel.externalChannelUrl(channel)?.let { url ->
+                                runCatching {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                }
+                            }
+                        }
+                    )
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun SupportChannelChoice(
+    name: String,
+    channels: List<String>,
+    onChat: () -> Unit,
+    onExternal: (String) -> Unit
+) {
+    val gold = Color(0xFFE9AE17)
+    val ink = Color(0xFF302C24)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFFBF5E8))
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp)
+    ) {
+        Text(name, color = ink, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(42.dp))
+        Text("👋 Welcome!", color = ink, fontSize = 29.sp, fontWeight = FontWeight.Bold)
+        Text("Please message us now", color = ink, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(30.dp))
+
+        if ("chat" in channels) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White, RoundedCornerShape(18.dp))
+                    .padding(20.dp)
+            ) {
+                Text(name, color = ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(20.dp))
+                Button(
+                    onClick = onChat,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = gold),
+                    shape = RoundedCornerShape(50)
+                ) {
+                    Text("Enter chat", color = ink, fontSize = 16.sp)
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+        }
+
+        channels.filter { it != "chat" }.forEach { channel ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White, RoundedCornerShape(18.dp))
+                    .clickable { onExternal(channel) }
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .background(
+                            if (channel == "whatsapp") Color(0xFF35C759) else Color(0xFF2AA7D7),
+                            RoundedCornerShape(50)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(if (channel == "whatsapp") "W" else "T", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.size(14.dp))
+                Text(
+                    if (channel == "whatsapp") "WhatsApp" else "Telegram",
+                    color = ink,
+                    fontSize = 16.sp
+                )
+                Spacer(Modifier.weight(1f))
+                Text("›", color = Color.Gray, fontSize = 24.sp)
+            }
+            Spacer(Modifier.height(12.dp))
         }
     }
 }
