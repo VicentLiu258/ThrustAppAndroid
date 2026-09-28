@@ -27,9 +27,6 @@ import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.SupportAgent
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -87,6 +84,11 @@ fun CalculatorScreen(
     val instrument = viewModel.currentInstrument()
     val currency = state.preferences.accountCurrency
 
+    val fabBottomPadding by animateDpAsState(
+        targetValue = if (state.searchQuery.isBlank()) 68.dp else 20.dp,
+        label = "chat_fab_bottom_padding"
+    )
+
     LaunchedEffect(state.message) {
         state.message?.let {
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
@@ -94,57 +96,49 @@ fun CalculatorScreen(
         }
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(colors.bgApp)
     ) {
-        // App Bar: 对齐原型, 纯正矢量Logo + 右侧动作按钮
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp)
-                .padding(horizontal = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.fillMaxSize()
         ) {
-            Image(
-                painter = painterResource(com.thrustwealth.app.R.drawable.ic_app_logo),
-                contentDescription = "Thrust Wealth",
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.height(26.dp)
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            IconButton(onClick = onOpenHistory) {
-                Icon(Icons.Outlined.History, contentDescription = "History", tint = colors.textPrimary)
-            }
-            IconButton(onClick = { viewModel.saveRecord() }) {
-                Icon(Icons.Outlined.BookmarkBorder, contentDescription = "Save", tint = colors.textPrimary)
-            }
-            // 客服入口: 融入顶部Header, 不遮挡输入框或结果卡
-            IconButton(onClick = onOpenChat) {
-                BadgedBox(
-                    badge = {
-                        if (unreadCount > 0) {
-                            Badge(
-                                containerColor = colors.brand,
-                                contentColor = Color.White
-                            ) {
-                                Text("$unreadCount", fontSize = 9.sp)
-                            }
-                        }
-                    }
-                ) {
-                    Icon(
-                        Icons.Outlined.SupportAgent,
-                        contentDescription = "Customer Support",
-                        tint = colors.textPrimary
-                    )
+            // App Bar: 统一品牌 App Icon + 标题及动作按钮
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Image(
+                    painter = painterResource(com.thrustwealth.app.R.drawable.app_logo),
+                    contentDescription = "Thrust Wealth",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(7.dp))
+                        .border(0.5.dp, colors.borderSubtle, RoundedCornerShape(7.dp))
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "Thrust Wealth",
+                    color = colors.textPrimary,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                IconButton(onClick = onOpenHistory) {
+                    Icon(Icons.Outlined.History, contentDescription = "History", tint = colors.textPrimary)
+                }
+                IconButton(onClick = { viewModel.saveRecord() }) {
+                    Icon(Icons.Outlined.BookmarkBorder, contentDescription = "Save", tint = colors.textPrimary)
+                }
+                IconButton(onClick = { viewModel.showMoreSheet(true) }) {
+                    Icon(Icons.Outlined.MoreVert, contentDescription = "More", tint = colors.textPrimary)
                 }
             }
-            IconButton(onClick = { viewModel.showMoreSheet(true) }) {
-                Icon(Icons.Outlined.MoreVert, contentDescription = "More", tint = colors.textPrimary)
-            }
-        }
 
         // 紧凑排版的计算器滚动区域: 保证首屏露出结果卡与主数值
         Column(
@@ -348,7 +342,7 @@ fun CalculatorScreen(
 
                 Spacer(modifier = Modifier.height(10.dp))
                 ComplianceDisclaimer()
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(84.dp))
             }
         }
 
@@ -361,6 +355,16 @@ fun CalculatorScreen(
             )
         }
     }
+
+    // 首页客服聊天悬浮入口: 恢复调整前的右下角浮动按钮
+    ChatFloatingActionButton(
+        onClick = onOpenChat,
+        unreadCount = unreadCount,
+        modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .padding(end = 16.dp, bottom = fabBottomPadding)
+    )
+}
 
     if (state.showSymbolPicker) {
         SymbolPickerSheet(
