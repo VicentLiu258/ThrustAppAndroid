@@ -76,15 +76,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.salesmartly.chatwidget.core.SalesmartlyUiState
-import com.salesmartly.chatwidget.domain.model.channelList
-import com.salesmartly.chatwidget.domain.model.channelOpenUri
-import com.salesmartly.chatwidget.ui.SalesmartlyChatHost
 import com.thrustwealth.app.BuildConfig
 import com.thrustwealth.app.data.repository.PreferencesRepository
 import com.thrustwealth.app.salesmartly.SalesmartlyManager
-import com.thrustwealth.app.ui.components.AppTopBar
-import com.thrustwealth.app.ui.components.ChannelIcon
-import com.thrustwealth.app.ui.components.resolveChannelMetadata
 import com.thrustwealth.app.ui.theme.ThrustTheme
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -175,9 +169,6 @@ fun ChatScreen(
     val conversationOpen = viewModel.directConversationOpen || sdkConversationOpen
     val sdkState by viewModel.salesmartlyUiState.collectAsState()
 
-    // 默认优先使用原生模式（响应式绑定后台 widgetInfo 数据流，性能流畅极佳），提供 Web 模式快速对比
-    var useWebMode by remember { mutableStateOf(false) }
-
     val widgetInfo = sdkState?.widgetInfo
     val avatarUrl = widgetInfo?.avatar_url
     val brandName = remember(widgetInfo?.plugin_name, widgetInfo?.window_name) {
@@ -189,114 +180,62 @@ fun ChatScreen(
     val welcomeText = remember(widgetInfo?.welcome) {
         widgetInfo?.welcome?.trim()?.ifBlank { "👋 Welcome!\nPlease message us now" } ?: "👋 Welcome!\nPlease message us now"
     }
-    val sortedChannels = remember(widgetInfo) {
-        widgetInfo?.channelList()?.takeIf { it.isNotEmpty() }
-            ?: widgetInfo?.channel?.takeIf { it.isNotEmpty() }
-            ?: listOf("chat", "whatsapp")
+    val enterChatAction = {
+        viewModel.enterConversation()
     }
-
-    // 处理原生返回逻辑
     BackHandler(enabled = true) {
-        if (!useWebMode && conversationOpen) {
+        if (conversationOpen) {
             viewModel.backToChannels()
         } else {
             onBack()
         }
     }
 
-    val showAppTopBar = useWebMode || conversationOpen
-
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (showAppTopBar) colors.bgApp else Color(0xFFFFF7EB))
+            .background(Color(0xFFFFF7EB))
             .navigationBarsPadding()
             .imePadding()
     ) {
-        if (showAppTopBar) {
-            AppTopBar(
-                title = if (!useWebMode && conversationOpen) brandName else "Customer Support",
-                onBack = {
-                    if (!useWebMode && conversationOpen) {
-                        viewModel.backToChannels()
-                    } else {
-                        onBack()
+        when {
+            !viewModel.scriptConfigured -> {
+                PlaceholderMessage(
+                    title = "Support not configured",
+                    body = "SaleSmartly script URL is missing. Add salesmartly.scriptUrl to local.properties and rebuild."
+                )
+            }
+            conversationOpen -> {
+                SalesmartlyWebChatHost(
+                    scriptUrl = viewModel.scriptUrl,
+                    directWebUrl = viewModel.directWebUrl,
+                    userId = viewModel.cachedUserId,
+                    onCloseChat = { viewModel.backToChannels() },
+                    modifier = Modifier.fillMaxSize(),
+                    onExternalUrl = { url ->
+                        handleExternalUrl(context, url)
                     }
+                )
+            }
+            !sdkReady -> {
+                Column(
+                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CircularProgressIndicator(color = colors.brand)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Connecting to support…", color = colors.textSecondary, fontSize = 14.sp)
                 }
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxSize()
-        ) {
-            when {
-                !viewModel.scriptConfigured -> {
-                    PlaceholderMessage(
-                        title = "Support not configured",
-                        body = "SaleSmartly script URL is missing. Add salesmartly.scriptUrl to local.properties and rebuild."
-                    )
-                }
-                useWebMode -> {
-                    SalesmartlyWebChatHost(
-                        scriptUrl = viewModel.scriptUrl,
-                        directWebUrl = viewModel.directWebUrl,
-                        userId = viewModel.cachedUserId,
-                        onCloseChat = onBack,
-                        modifier = Modifier.fillMaxSize(),
-                        onExternalUrl = { url ->
-                            handleExternalUrl(context, url)
-                        }
-                    )
-                }
-                !sdkReady -> {
-                    Column(
-                        modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        CircularProgressIndicator(color = colors.brand)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text("Connecting to support…", color = colors.textSecondary, fontSize = 14.sp)
-                    }
-                }
-                conversationOpen -> {
-                    val runtime = viewModel.runtimeOrNull()
-                    if (runtime != null) {
-                        SalesmartlyChatHost(
-                            runtime = runtime,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else {
-                        Column(
-                            modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            CircularProgressIndicator(color = colors.brand)
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text("Connecting to support…", color = colors.textSecondary, fontSize = 14.sp)
-                        }
-                    }
-                }
-                else -> {
-                    NativeSupportChannelView(
-                        brandName = brandName,
-                        avatarUrl = avatarUrl,
-                        welcomeText = welcomeText,
-                        brandColor = brandColor,
-                        channels = sortedChannels,
-                        onEnterChat = viewModel::enterConversation,
-                        onClose = onBack,
-                        onChannelClick = { channel ->
-                            val url = viewModel.externalChannelUrl(channel)
-                            if (!url.isNullOrBlank()) {
-                                handleExternalUrl(context, url)
-                            } else {
-                                android.widget.Toast.makeText(context, "$channel is not configured yet", android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    )
-                }
+            }
+            else -> {
+                NativeSupportChannelView(
+                    brandName = brandName,
+                    avatarUrl = avatarUrl,
+                    welcomeText = welcomeText,
+                    brandColor = brandColor,
+                    onEnterChat = enterChatAction,
+                    onClose = onBack
+                )
             }
         }
     }
@@ -317,10 +256,8 @@ private fun NativeSupportChannelView(
     avatarUrl: String?,
     welcomeText: String,
     brandColor: Color,
-    channels: List<String>,
     onEnterChat: () -> Unit,
-    onClose: () -> Unit,
-    onChannelClick: (String) -> Unit
+    onClose: () -> Unit
 ) {
     val colors = ThrustTheme.colors
     val isDark = colors.isDark
@@ -530,62 +467,7 @@ private fun NativeSupportChannelView(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // 其他渠道卡片列表（如 WhatsApp、Telegram 等，如有后台配置）
-            val externalChannels = channels.filter { it.lowercase() != "chat" }
-            if (externalChannels.isNotEmpty()) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    externalChannels.forEach { channel ->
-                        val meta = resolveChannelMetadata(channel, defaultBrandColor = brandColor)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .shadow(elevation = 2.dp, shape = RoundedCornerShape(18.dp))
-                                .clip(RoundedCornerShape(18.dp))
-                                .background(Color.White)
-                                .border(1.dp, Color(0xFFF0EBE1), RoundedCornerShape(18.dp))
-                                .clickable { onChannelClick(channel) }
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(42.dp)
-                                    .clip(CircleShape)
-                                    .background(meta.brandColor),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                ChannelIcon(
-                                    channel = channel,
-                                    meta = meta,
-                                    iconSize = 22.dp
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(16.dp))
-
-                            Text(
-                                text = meta.title,
-                                color = inkText,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-
-                            Spacer(modifier = Modifier.weight(1f))
-
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
-                                contentDescription = "Open",
-                                tint = colors.textTertiary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-                }
-            }
+            // 欢迎页面仅保留居中的核心对话卡片（按需移除 WhatsApp 等外部入口）
         }
     }
 }
@@ -655,6 +537,13 @@ fun SalesmartlyWebChatHost(
                     }, "AndroidBridge")
 
                     webChromeClient = object : WebChromeClient() {
+                        override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                            super.onProgressChanged(view, newProgress)
+                            if (newProgress >= 70) {
+                                isPageLoading = false
+                            }
+                        }
+
                         override fun onShowFileChooser(
                             webView: WebView?,
                             callback: ValueCallback<Array<Uri>>?,
@@ -780,7 +669,6 @@ private fun buildSaleSmartlyWebHtml(scriptUrl: String, userId: String): String {
               height: 100%;
               margin: 0;
               padding: 0;
-              overflow: hidden;
               background-color: #FAF5EB;
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             }
@@ -802,8 +690,22 @@ private fun buildSaleSmartlyWebHtml(scriptUrl: String, userId: String): String {
               height: 100%;
               position: relative;
             }
+            #ss-chat-page iframe {
+              width: 100% !important;
+              height: 100% !important;
+              border: none !important;
+            }
             .preview-spacer {
               display: none !important;
+            }
+            #ss-chat-container .salesmartly-chat-widget,
+            #ss-chat-page .salesmartly-chat-widget {
+              width: 100% !important;
+              height: 100% !important;
+            }
+            iframe[id*="salesmartly"], iframe[class*="salesmartly"] {
+              width: 100% !important;
+              height: 100% !important;
             }
           </style>
         </head>
@@ -822,6 +724,14 @@ private fun buildSaleSmartlyWebHtml(scriptUrl: String, userId: String): String {
             window.ssq = window.ssq || function() { (window.ssq.q = window.ssq.q || []).push(arguments) };
             window.ssq.push = window.ssq;
 
+            window.ssq.push("onReady", function() {
+              window.ssq.push("openChat");
+              try {
+                var btn = document.querySelector('.salesmartly-chat-widget, [class*="salesmartly"]');
+                if (btn) btn.click();
+              } catch(e) {}
+            });
+
             window.ssq.push("onCloseChat", function() {
               if (window.AndroidBridge && window.AndroidBridge.onCloseChat) {
                 window.AndroidBridge.onCloseChat();
@@ -838,6 +748,20 @@ private fun buildSaleSmartlyWebHtml(scriptUrl: String, userId: String): String {
                 label_names: ["android", "thrust_wealth"]
               });
             }
+
+            window.ssq.push("openChat");
+            setTimeout(function() {
+              window.ssq.push("openChat");
+              try {
+                var els = document.querySelectorAll('iframe, button, div');
+                for (var i = 0; i < els.length; i++) {
+                  if (els[i].className && (els[i].className.indexOf('salesmartly') !== -1 || els[i].className.indexOf('chat-button') !== -1)) {
+                    els[i].click();
+                    break;
+                  }
+                }
+              } catch(e) {}
+            }, 800);
           </script>
           <script src="$scriptUrl"></script>
         </body>
