@@ -99,7 +99,7 @@ class SalesmartlyManager @Inject constructor(
         })
 
         SalesmartlyChat.push("onOpenChat", SalesmartlyCallback {
-            // SDK 内部通知会话打开事件
+            _conversationOpen.value = true
         })
 
         SalesmartlyChat.push("onCloseChat", SalesmartlyCallback {
@@ -134,6 +134,28 @@ class SalesmartlyManager @Inject constructor(
             _conversationOpen.value = true
         }.onFailure { error ->
             Log.e(TAG, "Failed to open SaleSmartly conversation", error)
+        }
+    }
+
+    fun openSupportHome() {
+        initializeIfNeeded()
+        if (!_sdkReady.value) {
+            Log.w(TAG, "openSupportHome ignored: SDK not ready")
+            return
+        }
+        runCatching {
+            // Respects the console's home-page setting and keeps Enter chat inside the SDK.
+            SalesmartlyChat.open()
+        }.onFailure { error ->
+            Log.e(TAG, "Failed to open SaleSmartly home", error)
+        }
+    }
+
+    fun goBackToHome() {
+        runCatching {
+            SalesmartlyChat.runtime().goBackToHome()
+        }.onFailure { error ->
+            Log.e(TAG, "Failed to return to SaleSmartly home", error)
         }
     }
 
