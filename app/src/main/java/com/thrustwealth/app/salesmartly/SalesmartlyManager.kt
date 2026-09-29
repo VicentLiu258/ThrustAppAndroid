@@ -125,7 +125,16 @@ class SalesmartlyManager @Inject constructor(
 
     fun openConversation() {
         initializeIfNeeded()
-        _conversationOpen.value = true
+        if (!_sdkReady.value) {
+            Log.w(TAG, "openConversation ignored: SDK not ready")
+            return
+        }
+        runCatching {
+            SalesmartlyChat.openChat()
+            _conversationOpen.value = true
+        }.onFailure { error ->
+            Log.e(TAG, "Failed to open SaleSmartly conversation", error)
+        }
     }
 
     fun closeChat() {

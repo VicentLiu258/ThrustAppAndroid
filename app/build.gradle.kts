@@ -26,10 +26,6 @@ val configuredSalesmartlyScriptUrl = localProperties
 val salesmartlyScriptUrl = configuredSalesmartlyScriptUrl.ifBlank {
     "https://plugin-code.salesmartly.com/js/project_830957_862319_1789665876.js"
 }
-val configuredSalesmartlyWebUrl = localProperties
-    .getProperty("salesmartly.webUrl", "")
-    .trim()
-
 android {
     namespace = "com.thrustwealth.app"
     // SaleSmartly chatwidget-sdk-v1.0.3 requires compileSdk 36+
@@ -47,11 +43,6 @@ android {
             "String",
             "SALESMARTLY_SCRIPT_URL",
             "\"${salesmartlyScriptUrl.replace("\"", "\\\"")}\"",
-        )
-        buildConfigField(
-            "String",
-            "SALESMARTLY_WEB_URL",
-            "\"${configuredSalesmartlyWebUrl.replace("\"", "\\\"")}\"",
         )
     }
 
