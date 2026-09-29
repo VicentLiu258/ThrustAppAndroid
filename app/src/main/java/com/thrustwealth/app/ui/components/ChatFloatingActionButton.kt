@@ -316,11 +316,15 @@ fun ChannelIcon(
             )
         }
         "chat" -> {
-            ChatBubbleWithDotsIcon(
-                modifier = modifier.size(iconSize),
-                bubbleColor = Color.White,
-                dotsColor = meta.brandColor
-            )
+            Box(modifier = modifier.semantics { 
+                contentDescription = meta.title 
+            }) {
+                ChatBubbleWithDotsIcon(
+                    modifier = Modifier.size(iconSize),
+                    bubbleColor = Color.White,
+                    dotsColor = meta.brandColor
+                )
+            }
         }
         else -> {
             Text(

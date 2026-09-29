@@ -574,7 +574,13 @@ fun SalesmartlyWebChatHost(
                             tempWebView.webViewClient = object : WebViewClient() {
                                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                                     val targetUrl = request?.url?.toString() ?: return false
-                                    onExternalUrl(targetUrl)
+                                    val uri = request?.url
+                                    val host = uri?.host?.lowercase() ?: ""
+                                    if (host.contains("salesmartly.com")) {
+                                        this@apply.loadUrl(targetUrl)
+                                    } else {
+                                        onExternalUrl(targetUrl)
+                                    }
                                     return true
                                 }
                             }
@@ -718,19 +724,12 @@ private fun buildSaleSmartlyWebHtml(scriptUrl: String, userId: String): String {
             window.__ssc = window.__ssc || {};
             window.__ssc.setting = {
               mode: 'preview',
-              centerTarget: document.getElementById('ss-chat-page')
+              centerTarget: document.getElementById('ss-chat-page'),
+              centerTargetEl: document.getElementById('ss-chat-page')
             };
 
             window.ssq = window.ssq || function() { (window.ssq.q = window.ssq.q || []).push(arguments) };
             window.ssq.push = window.ssq;
-
-            window.ssq.push("onReady", function() {
-              window.ssq.push("openChat");
-              try {
-                var btn = document.querySelector('.salesmartly-chat-widget, [class*="salesmartly"]');
-                if (btn) btn.click();
-              } catch(e) {}
-            });
 
             window.ssq.push("onCloseChat", function() {
               if (window.AndroidBridge && window.AndroidBridge.onCloseChat) {
@@ -748,20 +747,6 @@ private fun buildSaleSmartlyWebHtml(scriptUrl: String, userId: String): String {
                 label_names: ["android", "thrust_wealth"]
               });
             }
-
-            window.ssq.push("openChat");
-            setTimeout(function() {
-              window.ssq.push("openChat");
-              try {
-                var els = document.querySelectorAll('iframe, button, div');
-                for (var i = 0; i < els.length; i++) {
-                  if (els[i].className && (els[i].className.indexOf('salesmartly') !== -1 || els[i].className.indexOf('chat-button') !== -1)) {
-                    els[i].click();
-                    break;
-                  }
-                }
-              } catch(e) {}
-            }, 800);
           </script>
           <script src="$scriptUrl"></script>
         </body>
