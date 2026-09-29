@@ -60,6 +60,7 @@ import com.thrustwealth.app.data.model.CalcMode
 import com.thrustwealth.app.engine.InstrumentConfig
 import com.thrustwealth.app.ui.components.ChatFloatingActionButton
 import com.thrustwealth.app.ui.components.ChatFloatingSpeedDial
+import com.thrustwealth.app.ui.components.enabledSupportChannels
 import com.thrustwealth.app.ui.components.ComplianceDisclaimer
 import com.thrustwealth.app.ui.components.DirectionSegmented
 import com.thrustwealth.app.ui.components.FormGroup
@@ -87,20 +88,22 @@ fun CalculatorScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val unreadCount by viewModel.unreadChatCount.collectAsState()
+    val salesmartlyReady by viewModel.salesmartlyReady.collectAsState()
     val salesmartlyUiState by viewModel.salesmartlyUiState.collectAsState()
-    val widgetInfo = salesmartlyUiState?.widgetInfo
+    val widgetInfo = salesmartlyUiState
+        ?.takeIf { salesmartlyReady && !it.isWidgetInfoLoading }
+        ?.widgetInfo
     val brandColor = remember(widgetInfo?.background_color) {
         parseHexColor(widgetInfo?.background_color, fallback = Color(0xFFE9AE17))
     }
     val channels = remember(widgetInfo) {
-        if (widgetInfo != null) {
-            val list = widgetInfo.channelList()
-            if (list.isNotEmpty()) list else widgetInfo.channel
-        } else {
-            listOf("chat", "whatsapp")
-        }
+        widgetInfo?.let { enabledSupportChannels(it.channelList(), it.channel) }.orEmpty()
     }
     var isChatFabExpanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(channels) {
+        if (channels.isEmpty()) isChatFabExpanded = false
+    }
 
     val colors = ThrustTheme.colors
     val context = LocalContext.current
@@ -136,20 +139,10 @@ fun CalculatorScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Image(
-                    painter = painterResource(com.thrustwealth.app.R.drawable.app_logo),
+                    painter = painterResource(com.thrustwealth.app.R.drawable.ic_thrust_text_logo),
                     contentDescription = "Thrust Wealth",
                     contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(RoundedCornerShape(7.dp))
-                        .border(0.5.dp, colors.borderSubtle, RoundedCornerShape(7.dp))
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = "Thrust Wealth",
-                    color = colors.textPrimary,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold
+                    modifier = Modifier.height(26.dp)
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 IconButton(onClick = onOpenHistory) {
@@ -395,7 +388,7 @@ fun CalculatorScreen(
     }
 
     // 首页客服多渠道展开收起悬浮挂件（完全响应式绑定 SaleSmartly 后台配置）
-    ChatFloatingSpeedDial(
+    if (channels.isNotEmpty()) ChatFloatingSpeedDial(
         channels = channels,
         brandColor = brandColor,
         unreadCount = unreadCount,

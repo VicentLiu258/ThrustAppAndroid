@@ -234,7 +234,7 @@ class SalesmartlyManager @Inject constructor(
         val rawUrl = info.channelOpenUri(channel) ?: return null
         val uri = Uri.parse(rawUrl)
         val scheme = uri.scheme?.lowercase()
-        if (scheme != "https" && scheme != "http" && scheme != "mailto" && scheme != "tel") return null
+        if (scheme !in setOf("https", "http", "mailto", "tel", "tg", "whatsapp", "line")) return null
         return rawUrl
     }
 

@@ -25,12 +25,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -53,6 +56,7 @@ import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -92,9 +96,9 @@ fun ChatFloatingSpeedDial(
         label = "fab_rotation"
     )
 
-    val validChannels = remember(channels) {
-        if (channels.isNotEmpty()) channels else listOf("chat", "whatsapp")
-    }
+    if (channels.isEmpty()) return
+    val validChannels = channels
+    val menuMaxHeight = (LocalConfiguration.current.screenHeightDp - 180).coerceAtLeast(120).dp
 
     Column(
         modifier = modifier,
@@ -114,6 +118,9 @@ fun ChatFloatingSpeedDial(
             )
         ) {
             Column(
+                modifier = Modifier
+                    .heightIn(max = menuMaxHeight)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -327,13 +334,35 @@ fun ChannelIcon(
             }
         }
         else -> {
-            Text(
-                text = meta.badgeLetter,
-                color = Color.White,
-                fontSize = if (meta.badgeLetter.length > 1) 13.sp else 18.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = modifier
-            )
+            val sdkIcon = when (channel.lowercase()) {
+                "telegram" -> com.salesmartly.chatwidget.R.drawable.ic_ssc_channel_telegram
+                "messenger" -> com.salesmartly.chatwidget.R.drawable.ic_ssc_channel_messenger
+                "line" -> com.salesmartly.chatwidget.R.drawable.ic_ssc_channel_line
+                "lineapp" -> com.salesmartly.chatwidget.R.drawable.ic_ssc_channel_line_app
+                "email" -> com.salesmartly.chatwidget.R.drawable.ic_ssc_channel_email
+                "instagram" -> com.salesmartly.chatwidget.R.drawable.ic_ssc_channel_instagram
+                "tiktok" -> com.salesmartly.chatwidget.R.drawable.ic_ssc_channel_tiktok
+                "zalo" -> com.salesmartly.chatwidget.R.drawable.ic_ssc_channel_zalo
+                "vkontakte" -> com.salesmartly.chatwidget.R.drawable.ic_ssc_channel_vkontakte
+                "weixin" -> com.salesmartly.chatwidget.R.drawable.ic_ssc_channel_weixin
+                else -> null
+            }
+            if (sdkIcon != null) {
+                Icon(
+                    painter = painterResource(id = sdkIcon),
+                    contentDescription = meta.title,
+                    tint = Color.White,
+                    modifier = modifier.size(iconSize)
+                )
+            } else {
+                Text(
+                    text = meta.badgeLetter,
+                    color = Color.White,
+                    fontSize = if (meta.badgeLetter.length > 1) 13.sp else 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = modifier.semantics { contentDescription = meta.title }
+                )
+            }
         }
     }
 }
@@ -346,6 +375,12 @@ data class ChannelMetadata(
     val badgeLetter: String,
     val brandColor: Color
 )
+
+/** Keep the SDK's preferred order, then append newly enabled channels it does not yet sort. */
+fun enabledSupportChannels(ordered: List<String>, configured: List<String>): List<String> {
+    val enabled = configured.map(String::trim).filter(String::isNotEmpty).distinct()
+    return (ordered.filter { it in enabled } + enabled).distinct()
+}
 
 fun resolveChannelMetadata(channel: String, defaultBrandColor: Color = Color(0xFFE9AE17)): ChannelMetadata {
     return when (channel.lowercase()) {
@@ -380,7 +415,7 @@ fun ChatFloatingActionButton(
     MainFloatingButton(
         isExpanded = false,
         rotationAngle = 0f,
-        brandColor = Color(0xFF2E7CF6),
+        brandColor = Color(0xFFE9AE17),
         unreadCount = unreadCount,
         onClick = onClick,
         modifier = modifier

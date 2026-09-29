@@ -218,16 +218,6 @@ fun AppTopBar(
             }
         } else {
             Spacer(modifier = Modifier.width(8.dp))
-            Image(
-                painter = painterResource(com.thrustwealth.app.R.drawable.app_logo),
-                contentDescription = "App Icon",
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(RoundedCornerShape(7.dp))
-                    .border(0.5.dp, colors.borderSubtle, RoundedCornerShape(7.dp))
-            )
-            Spacer(modifier = Modifier.width(10.dp))
         }
         Text(
             text = title,

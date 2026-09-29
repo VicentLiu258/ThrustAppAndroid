@@ -86,7 +86,7 @@ android {
             if (output is com.android.build.gradle.internal.api.BaseVariantOutputImpl) {
                 val formattedDate = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
                 val appName = "ThrustWealth"
-                output.outputFileName = "${appName}_v${variant.versionName}_${formattedDate}.apk"
+                output.outputFileName = "${appName}_${variant.versionName}_${formattedDate}.apk"
             }
         }
     }
@@ -101,7 +101,7 @@ tasks.matching { it.name.startsWith("bundle") && (it.name.endsWith("Release") ||
         if (originAab.exists()) {
             val formattedDate = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
             val appName = "ThrustWealth"
-            val targetName = "${appName}_v${android.defaultConfig.versionName}_${formattedDate}.aab"
+            val targetName = "${appName}_${android.defaultConfig.versionName}_${formattedDate}.aab"
             originAab.copyTo(File(bundleDir, targetName), overwrite = true)
         }
     }

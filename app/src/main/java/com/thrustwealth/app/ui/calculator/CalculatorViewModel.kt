@@ -65,6 +65,7 @@ class CalculatorViewModel @Inject constructor(
 
     val unreadChatCount: StateFlow<Int> = salesmartlyManager.unreadCount
     val salesmartlyUiState: StateFlow<SalesmartlyUiState?> = salesmartlyManager.uiState
+    val salesmartlyReady: StateFlow<Boolean> = salesmartlyManager.sdkReady
 
     fun externalChannelUrl(channel: String): String? = salesmartlyManager.externalChannelUrl(channel)
 
