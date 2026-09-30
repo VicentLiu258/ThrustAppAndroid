@@ -3,7 +3,13 @@ package com.thrustwealth.app.ui.calculator
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -98,11 +104,6 @@ fun CalculatorScreen(
     }
     val channels = remember(widgetInfo) {
         widgetInfo?.let { enabledSupportChannels(it.channelList(), it.channel) }.orEmpty()
-    }
-    var isChatFabExpanded by remember { mutableStateOf(false) }
-
-    LaunchedEffect(channels) {
-        if (channels.isEmpty()) isChatFabExpanded = false
     }
 
     val colors = ThrustTheme.colors
@@ -372,55 +373,43 @@ fun CalculatorScreen(
         }
     }
 
-    // 展开状态下的半透明全局暗化遮罩
-    if (isChatFabExpanded) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.45f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) {
-                    isChatFabExpanded = false
-                }
-        )
-    }
-
-    // 首页客服多渠道展开收起悬浮挂件（完全响应式绑定 SaleSmartly 后台配置）
-    if (channels.isNotEmpty()) ChatFloatingSpeedDial(
-        channels = channels,
-        brandColor = brandColor,
-        unreadCount = unreadCount,
-        isExpanded = isChatFabExpanded,
-        onExpandedChange = { isChatFabExpanded = it },
-        onChatClick = {
-            viewModel.prepareNativeChat()
-            onOpenChat()
-        },
-        onExternalChannelClick = { channel ->
-            val targetUrl = viewModel.externalChannelUrl(channel)
-            if (!targetUrl.isNullOrBlank()) {
-                runCatching {
-                    val uri = Uri.parse(targetUrl)
-                    val intent = if (targetUrl.startsWith("mailto:", ignoreCase = true)) {
-                        Intent(Intent.ACTION_SENDTO, uri)
-                    } else {
-                        Intent(Intent.ACTION_VIEW, uri)
-                    }
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(intent)
-                }.onFailure {
-                    Toast.makeText(context, "Could not open $channel application", Toast.LENGTH_SHORT).show()
-                }
-            } else {
-                Toast.makeText(context, "$channel is not configured yet", Toast.LENGTH_SHORT).show()
-            }
-        },
+    // 首页客服多渠道悬浮挂件（固定显示 SaleSmartly、WhatsApp、Telegram 三个图标）
+    // 确保 SDK 和配置（widgetInfo）完全加载后再显示入口，避免 "is not configured yet" 错误
+    AnimatedVisibility(
+        visible = widgetInfo != null,
         modifier = Modifier
             .align(Alignment.BottomEnd)
-            .padding(end = 16.dp, bottom = fabBottomPadding)
-    )
+            .padding(end = 16.dp, bottom = fabBottomPadding),
+        enter = fadeIn(tween(300)) + slideInVertically(initialOffsetY = { it / 2 }),
+        exit = fadeOut(tween(300)) + slideOutVertically(targetOffsetY = { it / 2 })
+    ) {
+        ChatFloatingSpeedDial(
+            unreadCount = unreadCount,
+            onChatClick = {
+                viewModel.prepareNativeChat()
+                onOpenChat()
+            },
+            onExternalChannelClick = { channel ->
+                val targetUrl = viewModel.externalChannelUrl(channel)
+                if (!targetUrl.isNullOrBlank()) {
+                    runCatching {
+                        val uri = Uri.parse(targetUrl)
+                        val intent = if (targetUrl.startsWith("mailto:", ignoreCase = true)) {
+                            Intent(Intent.ACTION_SENDTO, uri)
+                        } else {
+                            Intent(Intent.ACTION_VIEW, uri)
+                        }
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(intent)
+                    }.onFailure {
+                        Toast.makeText(context, "Could not open $channel application", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    Toast.makeText(context, "$channel is not configured yet", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+    }
 }
 
     if (state.showSymbolPicker) {

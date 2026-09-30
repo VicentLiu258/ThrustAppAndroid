@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -80,80 +81,82 @@ import com.thrustwealth.app.ui.theme.ThrustTheme
  */
 @Composable
 fun ChatFloatingSpeedDial(
-    channels: List<String>,
-    brandColor: Color,
     unreadCount: Int,
-    isExpanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit,
     onChatClick: () -> Unit,
     onExternalChannelClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // 主按钮旋转角度动画：0°（+号）-> 45°（旋转后呈现为完美的对角线x号）
-    val rotationAngle by animateFloatAsState(
-        targetValue = if (isExpanded) 45f else 0f,
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = 420f),
-        label = "fab_rotation"
-    )
-
-    if (channels.isEmpty()) return
-    val validChannels = channels
-    val menuMaxHeight = (LocalConfiguration.current.screenHeightDp - 180).coerceAtLeast(120).dp
-
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 向上展开的渠道项列表
-        AnimatedVisibility(
-            visible = isExpanded,
-            enter = fadeIn(tween(180)) + slideInVertically(
-                initialOffsetY = { it / 2 },
-                animationSpec = spring(dampingRatio = 0.7f, stiffness = 400f)
-            ),
-            exit = fadeOut(tween(140)) + slideOutVertically(
-                targetOffsetY = { it / 2 },
-                animationSpec = tween(140)
-            )
-        ) {
-            Column(
+        val badgeRed = Color(0xFFEF4444)
+
+        // 1. SaleSmartly Chat Bubble
+        Box(contentAlignment = Alignment.Center) {
+            Image(
+                painter = painterResource(id = R.drawable.ic_bubble_salesmartly),
+                contentDescription = "Customer Support",
                 modifier = Modifier
-                    .heightIn(max = menuMaxHeight)
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                validChannels.forEach { channel ->
-                    ChannelSpeedDialItem(
-                        channel = channel,
-                        brandColor = brandColor,
-                        onClick = {
-                            onExpandedChange(false)
-                            if (channel.lowercase() == "chat") {
-                                onChatClick()
-                            } else {
-                                onExternalChannelClick(channel)
-                            }
-                        }
+                    .size(76.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onChatClick
+                    )
+            )
+
+            // Unread badge on top right
+            if (unreadCount > 0) {
+                val badgeText = if (unreadCount > 99) "99+" else unreadCount.toString()
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 2.dp, y = 2.dp)
+                        .defaultMinSize(minWidth = 19.dp, minHeight = 19.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(badgeRed)
+                        .border(1.5.dp, Color.White, RoundedCornerShape(10.dp))
+                        .padding(horizontal = 4.dp, vertical = 1.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = badgeText,
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 12.sp
                     )
                 }
             }
         }
 
-        // 主悬浮按钮（FAB）
-        MainFloatingButton(
-            isExpanded = isExpanded,
-            rotationAngle = rotationAngle,
-            brandColor = brandColor,
-            unreadCount = unreadCount,
-            onClick = {
-                if (validChannels.size <= 1 && validChannels.firstOrNull()?.lowercase() == "chat") {
-                    onChatClick()
-                } else {
-                    onExpandedChange(!isExpanded)
-                }
-            }
+        // 2. WhatsApp Bubble
+        Image(
+            painter = painterResource(id = R.drawable.ic_bubble_whatsapp),
+            contentDescription = "WhatsApp",
+            modifier = Modifier
+                .size(76.dp)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = { onExternalChannelClick("whatsapp") }
+                )
+        )
+
+        // 3. Telegram Bubble
+        Image(
+            painter = painterResource(id = R.drawable.ic_bubble_telegram),
+            contentDescription = "Telegram",
+            modifier = Modifier
+                .size(76.dp)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = { onExternalChannelClick("telegram") }
+                )
         )
     }
 }
